@@ -21,19 +21,27 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      required: false,
       minlength: [6, 'Password must be at least 6 characters long'],
       select: false, // Exclude by default from query results
     },
     college: {
       type: String,
-      required: [true, 'College name is required'],
+      required: false,
       trim: true,
     },
     role: {
       type: String,
       enum: ['student', 'admin'],
       default: 'student',
+    },
+    googleId: {
+      type: String,
+      default: null,
+    },
+    githubId: {
+      type: String,
+      default: null,
     },
   },
   {

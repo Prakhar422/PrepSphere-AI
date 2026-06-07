@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Menu, X, ArrowRight, ChevronRight } from "lucide-react";
-import {useNavigate} from "react-router-dom";
-import login from "../../pages/Login";
-import signUp from "../../pages/SignUp";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 
 const Navbar = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeLink, setActiveLink] = useState(null);
@@ -133,27 +133,50 @@ const Navbar = () => {
 
           {/* Right Side Buttons (Desktop) */}
           <div className="hidden md:flex items-center space-x-6">
-            <button
-            onClick={() => navigate("/login")} 
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors duration-200 cursor-pointer focus:outline-none">
-              Log in
-            </button>
-            
-            {/* Primary CTA: Rounded pill with gradient & glow */}
-            <button 
-            onClick={() => navigate("/signup")}
-            className="relative group inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm font-medium text-white cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] focus:outline-none">
-              {/* Outer boundary gradient */}
-              <span className="absolute inset-0 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 rounded-full" />
-              {/* Glow shadow layer */}
-              <span className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-full blur-md opacity-45 group-hover:opacity-85 transition duration-500 group-hover:duration-200" />
-              
-              {/* Main content button wrapper */}
-              <span className="relative px-6 py-2.5 bg-[#050B1F] rounded-full transition-all duration-300 group-hover:bg-transparent flex items-center gap-1.5 font-semibold">
-                Get Started
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
-              </span>
-            </button>
+            {user ? (
+              <>
+                <span className="text-sm font-medium text-indigo-300">
+                  Hi, {user.name.split(' ')[0]}
+                </span>
+                <button
+                  onClick={() => navigate("/dashboard")} 
+                  className="text-sm font-medium text-slate-300 hover:text-white transition-colors duration-200 cursor-pointer focus:outline-none"
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={logout}
+                  className="relative group inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm font-medium text-white cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] focus:outline-none"
+                >
+                  <span className="absolute inset-0 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 rounded-full" />
+                  <span className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-full blur-md opacity-45 group-hover:opacity-85 transition duration-500 group-hover:duration-200" />
+                  <span className="relative px-5 py-2 bg-[#050B1F] rounded-full transition-all duration-300 group-hover:bg-transparent flex items-center gap-1.5 font-semibold">
+                    Logout
+                  </span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => navigate("/login")} 
+                  className="text-sm font-medium text-slate-300 hover:text-white transition-colors duration-200 cursor-pointer focus:outline-none"
+                >
+                  Log in
+                </button>
+                
+                <button 
+                  onClick={() => navigate("/register")}
+                  className="relative group inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm font-medium text-white cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] focus:outline-none"
+                >
+                  <span className="absolute inset-0 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 rounded-full" />
+                  <span className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-full blur-md opacity-45 group-hover:opacity-85 transition duration-500 group-hover:duration-200" />
+                  <span className="relative px-6 py-2.5 bg-[#050B1F] rounded-full transition-all duration-300 group-hover:bg-transparent flex items-center gap-1.5 font-semibold">
+                    Get Started
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
+                  </span>
+                </button>
+              </>
+            )}
           </div>
 
           {/* Mobile Hamburger Button */}
@@ -256,27 +279,63 @@ const Navbar = () => {
 
         {/* Drawer Footer Buttons */}
         <div className="pt-6 border-t border-white/5 flex flex-col space-y-4">
-          <button 
-            onClick={() => {setIsOpen(false);
-                 navigate("/login");}}
-            className="w-full py-3.5 rounded-full text-center text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 border border-white/10 transition-all duration-200 cursor-pointer focus:outline-none"
-          >
-            Log in
-          </button>
-          
-          <button 
-            onClick={() => {setIsOpen(false);
-                    navigate("/signup");
-            }}
-            className="w-full relative group inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm font-semibold text-white cursor-pointer transition-all duration-300 focus:outline-none"
-          >
-            <span className="absolute inset-0 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 rounded-full" />
-            <span className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-full blur-md opacity-35 group-hover:opacity-75 transition duration-300" />
-            <span className="relative w-full py-3.5 bg-[#050B1F] rounded-full transition-all duration-200 group-hover:bg-transparent flex items-center justify-center gap-2">
-              Get Started
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
-            </span>
-          </button>
+          {user ? (
+            <>
+              <div className="text-center text-xs text-indigo-300 font-medium pb-2 border-b border-white/5">
+                Hi, {user.name}
+              </div>
+              <button 
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate("/dashboard");
+                }}
+                className="w-full py-3.5 rounded-full text-center text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 border border-white/10 transition-all duration-200 cursor-pointer focus:outline-none"
+              >
+                Dashboard
+              </button>
+              
+              <button 
+                onClick={() => {
+                  setIsOpen(false);
+                  logout();
+                }}
+                className="w-full relative group inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm font-semibold text-white cursor-pointer transition-all duration-300 focus:outline-none"
+              >
+                <span className="absolute inset-0 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 rounded-full" />
+                <span className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-full blur-md opacity-35 group-hover:opacity-75 transition duration-300" />
+                <span className="relative w-full py-3.5 bg-[#050B1F] rounded-full transition-all duration-200 group-hover:bg-transparent flex items-center justify-center gap-2">
+                  Logout
+                </span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate("/login");
+                }}
+                className="w-full py-3.5 rounded-full text-center text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 border border-white/10 transition-all duration-200 cursor-pointer focus:outline-none"
+              >
+                Log in
+              </button>
+              
+              <button 
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate("/register");
+                }}
+                className="w-full relative group inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm font-semibold text-white cursor-pointer transition-all duration-300 focus:outline-none"
+              >
+                <span className="absolute inset-0 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 rounded-full" />
+                <span className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-full blur-md opacity-35 group-hover:opacity-75 transition duration-300" />
+                <span className="relative w-full py-3.5 bg-[#050B1F] rounded-full transition-all duration-200 group-hover:bg-transparent flex items-center justify-center gap-2">
+                  Get Started
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
+                </span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </>

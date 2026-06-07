@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { 
   Github, 
   Mail, 
@@ -25,6 +26,7 @@ import {
 
 const SignUp = () => {
   const navigate = useNavigate();
+  const { register } = useAuth();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -42,6 +44,8 @@ const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [emailError, setEmailError] = useState(false);
 
   // Email validation helper
   const isEmailValid = (val) => {
@@ -82,17 +86,33 @@ const SignUp = () => {
 
   const strength = getPasswordStrength(password);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isFormValid) return;
 
     setErrorMessage("");
+    setSuccessMessage("");
+    setEmailError(false);
     setIsSubmitting(true);
     
-    setTimeout(() => {
+    try {
+      const data = await register(name, email, password, college);
+      setSuccessMessage(data.message || "Account created successfully! Redirecting to login...");
+      setTimeout(() => {
+        setIsSubmitting(false);
+        navigate("/login");
+      }, 1500);
+    } catch (err) {
       setIsSubmitting(false);
-      navigate("/login");
-    }, 1500);
+      const errMsg = err.message || "";
+      const isDuplicate = errMsg.toLowerCase().includes("exist") || errMsg.toLowerCase().includes("already");
+      if (isDuplicate) {
+        setErrorMessage("An account with this email already exists. Please login instead.");
+        setEmailError(true);
+      } else {
+        setErrorMessage(errMsg || "Registration failed");
+      }
+    }
   };
 
   return (
@@ -414,6 +434,14 @@ const SignUp = () => {
               </div>
             )}
 
+            {/* Success message */}
+            {successMessage && (
+              <div className="flex items-center space-x-2 p-3 mb-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 text-left">
+                <CheckCircle className="w-4 h-4 shrink-0" />
+                <span>{successMessage}</span>
+              </div>
+            )}
+
             {/* Form (Optimized field spacing: space-y-3) */}
             <form onSubmit={handleSubmit} className="space-y-3 text-left">
               
@@ -446,9 +474,14 @@ const SignUp = () => {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError(false);
+                    }}
                     placeholder="name@college.edu"
-                    className="w-full bg-[#050B1F]/60 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-all duration-350 placeholder:text-slate-600"
+                    className={`w-full bg-[#050B1F]/60 border ${
+                      emailError ? 'border-red-500/80 ring-1 ring-red-500/30' : 'border-white/10'
+                    } rounded-xl pl-9 pr-4 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-all duration-350 placeholder:text-slate-600`}
                   />
                 </div>
                 {email && !isEmailValid(email) && (
@@ -599,7 +632,13 @@ const SignUp = () => {
 
             {/* Social Logins (Fully visible, spacing adjusted, glassmorphism hover) */}
             <div className="flex gap-4">
-              <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.06] hover:border-white/15 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] text-xs font-semibold text-slate-200 transition-all duration-300 cursor-pointer focus:outline-none">
+              <button 
+                type="button"
+                onClick={() => {
+                  window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/google`;
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.06] hover:border-white/15 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] text-xs font-semibold text-slate-200 transition-all duration-300 cursor-pointer focus:outline-none"
+              >
                 <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -609,7 +648,13 @@ const SignUp = () => {
                 Google
               </button>
 
-              <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.06] hover:border-white/15 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] text-xs font-semibold text-slate-200 transition-all duration-300 cursor-pointer focus:outline-none">
+              <button 
+                type="button"
+                onClick={() => {
+                  window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/github`;
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.06] hover:border-white/15 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] text-xs font-semibold text-slate-200 transition-all duration-300 cursor-pointer focus:outline-none"
+              >
                 <Github className="w-3.5 h-3.5 shrink-0" />
                 GitHub
               </button>
