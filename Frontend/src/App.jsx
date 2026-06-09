@@ -4,6 +4,7 @@ import LandingPage from "./pages/LandingPage";
 import SignUp from "./pages/SignUp";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import ResumeAnalyzer from "./pages/ResumeAnalyzer";
 import OAuthSuccess from "./pages/OAuthSuccess";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -30,6 +31,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resume-analyzer"
+            element={
+              <ProtectedRoute>
+                <ResumeAnalyzer />
               </ProtectedRoute>
             }
           />

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
+import resumeRoutes from './routes/resumeRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -24,6 +25,7 @@ app.get('/', (req, res) => {
 
 // Route mountings
 app.use('/api/auth', authRoutes);
+app.use('/api/resume', resumeRoutes);
 
 // Fallback Route (404 Not Found)
 app.use((req, res, next) => {

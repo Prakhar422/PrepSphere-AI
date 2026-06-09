@@ -78,14 +78,14 @@ const Dashboard = () => {
 
   // Sidebar navigation items
   const navItems = [
-    { name: "Dashboard", icon: LayoutDashboard, active: true },
-    { name: "Aptitude Practice", icon: Brain, active: false },
-    { name: "Resume Analyzer", icon: FileSearch, active: false },
-    { name: "Mock Interview", icon: MessageSquareCode, active: false },
-    { name: "Coding Tracker", icon: Code2, active: false },
-    { name: "Interview Experiences", icon: BookOpen, active: false },
-    { name: "Career Analytics", icon: LineChart, active: false },
-    { name: "Settings", icon: SettingsIcon, active: false },
+    { name: "Dashboard", icon: LayoutDashboard, active: true, path: "/dashboard" },
+    { name: "Aptitude Practice", icon: Brain, active: false, path: "/aptitude-practice" },
+    { name: "Resume Analyzer", icon: FileSearch, active: false, path: "/resume-analyzer" },
+    { name: "Mock Interview", icon: MessageSquareCode, active: false, path: "/mock-interview" },
+    { name: "Coding Tracker", icon: Code2, active: false, path: "/coding-tracker" },
+    { name: "Interview Experiences", icon: BookOpen, active: false, path: "/interview-experiences" },
+    { name: "Career Analytics", icon: LineChart, active: false, path: "/career-analytics" },
+    { name: "Settings", icon: SettingsIcon, active: false, path: "/settings" },
   ];
 
   // Contest Mock Data
@@ -262,6 +262,7 @@ const Dashboard = () => {
             {navItems.map((item, idx) => (
               <button
                 key={idx}
+                onClick={() => navigate(item.path)}
                 className={`w-full flex items-center space-x-3.5 px-4 py-3 rounded-xl text-left text-base font-medium transition-all duration-200 cursor-pointer ${
                   item.active
                     ? "bg-gradient-to-r from-indigo-500/15 to-purple-500/10 text-indigo-300 border border-indigo-500/25 shadow-[0_4px_20px_rgba(99,102,241,0.08)]"
@@ -340,7 +341,10 @@ const Dashboard = () => {
                     {navItems.map((item, idx) => (
                       <button
                         key={idx}
-                        onClick={() => setSidebarOpen(false)}
+                        onClick={() => {
+                          setSidebarOpen(false);
+                          navigate(item.path);
+                        }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-left text-base font-medium transition-all duration-200 ${
                           item.active
                             ? "bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-indigo-300 border-l-[3px] border-indigo-500 pl-3.5"
