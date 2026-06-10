@@ -42,55 +42,9 @@ import {
 } from "lucide-react";
 
 // Placeholder JSON data representing ATS and Recruiter feedback schema
-const defaultAnalysisData = {
-  atsScore: 87,
-  atsScoreLabel: "Excellent",
-  atsScoreDescription: "Your resume is highly optimized for premium software engineering placements.",
-  skillsMatch: 82,
-  formattingScore: 91,
-  formattingScoreLabel: "Professional Layout",
-  placementReadiness: "Advanced", // Foundation, Intermediate, Advanced, Placement Ready
-  suggestions: [
-    { id: 1, text: "Add measurable achievements", explanation: "Include metrics and percentages (e.g., 'Improved database load times by 40% using Redis caching') to demonstrate concrete technical impact.", priority: "High", color: "text-red-400 bg-red-500/10 border-red-500/20" },
-    { id: 2, text: "Improve action verbs", explanation: "Begin project descriptions with authoritative verbs like 'Architected', 'Implemented', or 'Orchestrated' rather than passive ones.", priority: "Medium", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-    { id: 3, text: "Strengthen project descriptions", explanation: "Detail backend system design trade-offs, network throughput parameters, and host deployment configurations.", priority: "Medium", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-    { id: 4, text: "Add technical keywords", explanation: "Weave target recruitment keywords such as Docker containerization, REST API optimization, and CI/CD pipelines into your profile.", priority: "High", color: "text-red-400 bg-red-500/10 border-red-500/20" },
-    { id: 5, text: "Elaborate on internship scope", explanation: "Describe technical ownership, collaboration methodologies, and product lifecycle interactions in your industrial logs.", priority: "Low", color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20" },
-    { id: 6, text: "Optimize GitHub readme docs", explanation: "Make sure all primary repositories feature descriptive README walkthroughs, architectural diagrams, and license markers.", priority: "Low", color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20" }
-  ],
-  missingKeywords: [
-    "React", "Node.js", "Express", "MongoDB", "JWT", "REST API", "Docker", "AWS", "Redis", "System Design", "CI/CD", "Problem Solving"
-  ],
-  sectionAnalysis: {
-    education: { score: 95, status: "Strong", suggestions: "Education block is correctly laid out with graduation timestamps, GPA logs, and core course details." },
-    projects: { score: 80, status: "Needs Improvement", suggestions: "Specify tool configurations and deployment credentials. Link project details to live URLs or video demonstrations." },
-    skills: { score: 90, status: "Strong", suggestions: "Technical capabilities are categorized well. Grouping into core categories helps parsing accuracy." },
-    experience: { score: 75, status: "Needs Improvement", suggestions: "Quantify metrics. Use formulas (Accomplished X, measured by Y, by doing Z) to explain duties." },
-    achievements: { score: 85, status: "Good", suggestions: "Include competitive programming accomplishments, LeetCode ratings, or placement milestones." },
-    certifications: { score: 92, status: "Strong", suggestions: "Professional credentials are clear, valid, and linked correctly to verified provider platforms." }
-  },
-  overallFeedback: {
-    rating: "4.5 / 5.0",
-    strengths: "Excellent technical stack matches. The formatting sections align perfectly with standard ATS parsers. Strong competitive programming highlights.",
-    weaknesses: "Generics used in core descriptors. Insufficient metric numbers verifying quantitative engineering impact.",
-    recruiterPerspective: "Candidates with this profile show strong backend competence. Adding system design terminology and caching optimization records will elevate them to shortlist groups.",
-    finalRecommendation: "Embed at least 3 missing keywords (e.g., Redis, CI/CD) and rephrase project statements to lead with metrics before submitting to premium placement pools."
-  }
-};
 
-const initialHistory = [
-  { id: "hist-1", name: "Alex_Mercer_Resume_v2.pdf", date: "June 08, 2026", score: 87, status: "Analyzed", data: defaultAnalysisData },
-  { id: "hist-2", name: "Alex_Mercer_Resume_v1.pdf", date: "May 24, 2026", score: 72, status: "Needs Optimization", data: {
-    ...defaultAnalysisData,
-    atsScore: 72,
-    atsScoreLabel: "Needs Optimization",
-    atsScoreDescription: "Your resume needs layout and keyword improvements to pass premium benchmarks.",
-    skillsMatch: 64,
-    formattingScore: 80,
-    formattingScoreLabel: "Standard Layout",
-    placementReadiness: "Intermediate"
-  } }
-];
+
+const initialHistory = [];
 
 const ResumeAnalyzer = () => {
   const { user, logout } = useAuth();
@@ -216,17 +170,17 @@ const ResumeAnalyzer = () => {
         await new Promise(resolve => setTimeout(resolve, 600));
         setIsAnalyzing(false);
         
-        // Display existing dummy analysis JSON already used by the UI
-        setAnalysisResult(defaultAnalysisData);
+        // Display real Gemini analysis returned by the backend
+        setAnalysisResult(response.data.analysis);
 
-        // Add to history list using backend resume values
+        // Add to history list using backend resume and analysis values
         const newHistoryItem = {
           id: backendResume.id,
           name: backendResume.resumeName,
           date: new Date(backendResume.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-          score: defaultAnalysisData.atsScore,
-          status: "Analyzed",
-          data: defaultAnalysisData
+          score: response.data.analysis.atsAnalysis?.score || response.data.analysis.atsScore || 0,
+          status: (response.data.analysis.atsAnalysis?.score || response.data.analysis.atsScore || 0) >= 80 ? "Analyzed" : "Needs Optimization",
+          data: response.data.analysis
         };
 
         setHistoryList(prev => [newHistoryItem, ...prev]);
@@ -547,7 +501,7 @@ const ResumeAnalyzer = () => {
                           <div className="relative flex items-center justify-center w-36 h-36">
                             <svg className="w-36 h-36 transform -rotate-90">
                               <circle cx="72" cy="72" r="62" className="text-slate-800" strokeWidth="8" stroke="currentColor" fill="transparent" />
-                              <circle cx="72" cy="72" r="62" className="text-transparent" strokeWidth="8" strokeDasharray={390} strokeDashoffset={390 - (390 * analysisResult.atsScore) / 100} strokeLinecap="round" stroke="url(#result-gradient)" fill="transparent" />
+                              <circle cx="72" cy="72" r="62" className="text-transparent" strokeWidth="8" strokeDasharray={390} strokeDashoffset={390 - (390 * (analysisResult.atsAnalysis?.score || 0)) / 100} strokeLinecap="round" stroke="url(#result-gradient)" fill="transparent" />
                               <defs>
                                 <linearGradient id="result-gradient" x1="0" y1="0" x2="100%" y2="100%">
                                   <stop offset="0%" stopColor="#6366f1" />
@@ -557,14 +511,14 @@ const ResumeAnalyzer = () => {
                               </defs>
                             </svg>
                             <div className="absolute text-center">
-                              <span className="text-4xl font-extrabold text-white">{analysisResult.atsScore}%</span>
+                              <span className="text-4xl font-extrabold text-white">{analysisResult.atsAnalysis?.score || 0}%</span>
                               <span className="block text-xs font-semibold text-slate-400 mt-1 uppercase tracking-wider">ATS MATCH</span>
                             </div>
                           </div>
 
                           <div className="mt-4">
                             <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
-                              {analysisResult.atsScoreLabel}
+                              {analysisResult.atsAnalysis?.label || ''}
                             </span>
                           </div>
                         </div>
@@ -574,7 +528,7 @@ const ResumeAnalyzer = () => {
                           <div>
                             <h3 className="text-lg font-semibold text-white">Diagnostics Rating</h3>
                             <p className="text-sm text-slate-300 font-light mt-1.5 leading-relaxed">
-                              {analysisResult.atsScoreDescription}
+                              {analysisResult.diagnostics?.description || ''}
                             </p>
                           </div>
 
@@ -583,10 +537,10 @@ const ResumeAnalyzer = () => {
                             <div>
                               <div className="flex justify-between text-sm text-slate-400 mb-1.5">
                                 <span>Skills Match</span>
-                                <span className="font-semibold text-indigo-400">{analysisResult.skillsMatch}%</span>
+                                <span className="font-semibold text-indigo-400">{analysisResult.diagnostics?.skillsMatch || 0}%</span>
                               </div>
                               <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${analysisResult.skillsMatch}%` }} />
+                                <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${analysisResult.diagnostics?.skillsMatch || 0}%` }} />
                               </div>
                             </div>
 
@@ -594,12 +548,14 @@ const ResumeAnalyzer = () => {
                             <div>
                               <div className="flex justify-between text-sm text-slate-400 mb-1.5">
                                 <span>Formatting &amp; Layout</span>
-                                <span className="font-semibold text-purple-400">{analysisResult.formattingScore}%</span>
+                                <span className="font-semibold text-purple-400">{analysisResult.diagnostics?.formatting || 0}%</span>
                               </div>
                               <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500" style={{ width: `${analysisResult.formattingScore}%` }} />
+                                <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500" style={{ width: `${analysisResult.diagnostics?.formatting || 0}%` }} />
                               </div>
-                              <span className="block text-xs text-slate-500 mt-1">{analysisResult.formattingScoreLabel}</span>
+                              <span className="block text-xs text-slate-500 mt-1">
+                                {(analysisResult.diagnostics?.formatting || 0) >= 90 ? 'Professional Layout' : 'Standard Layout'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -662,16 +618,14 @@ const ResumeAnalyzer = () => {
                         <div className="absolute top-8 left-[12%] right-[12%] h-[1.5px] bg-white/5 hidden sm:block z-0" />
 
                         {[
-                          { key: "Foundation", label: "Foundation Scope", desc: "Covers personal metadata details, basic skills categorization, and GPA indicators." },
-                          { key: "Intermediate", label: "Intermediate Matrix", desc: "Includes basic internships log entries and primary technical project specifications." },
-                          { key: "Advanced", label: "Advanced ATS Align", desc: "Demonstrates optimization matching high-priority industry tags and system structures." },
-                          { key: "Placement Ready", label: "Placement Ready", desc: "Demonstrates concrete metrics impact and system design keywords fit for premium companies." }
+                          { label: "Foundation Scope", desc: "Covers personal metadata details, basic skills categorization, and GPA indicators." },
+                          { label: "Intermediate Matrix", desc: "Includes basic internships log entries and primary technical project specifications." },
+                          { label: "Advanced ATS Align", desc: "Demonstrates optimization matching high-priority industry tags and system structures." },
+                          { label: "Placement Ready", desc: "Demonstrates concrete metrics impact and system design keywords fit for premium companies." }
                         ].map((stage, idx) => {
-                          const stagesList = ["Foundation", "Intermediate", "Advanced", "Placement Ready"];
-                          const currentStageIndex = stagesList.indexOf(analysisResult.placementReadiness);
-                          const stageIndex = stagesList.indexOf(stage.key);
-                          const isActive = stageIndex <= currentStageIndex;
-                          const isCurrent = stage.key === analysisResult.placementReadiness;
+                          const currentStageIndex = (analysisResult.placementReadiness?.currentStage || 1) - 1;
+                          const isActive = idx <= currentStageIndex;
+                          const isCurrent = idx === currentStageIndex;
 
                           return (
                             <div key={idx} className="flex flex-col items-center sm:items-start text-center sm:text-left relative z-10">
@@ -714,15 +668,21 @@ const ResumeAnalyzer = () => {
                         </h3>
 
                         <div className="space-y-4 max-h-[380px] overflow-y-auto pr-2">
-                          {analysisResult.suggestions.map((sug) => (
-                            <div key={sug.id} className="p-4 bg-slate-950/30 border border-white/5 rounded-2xl flex flex-col space-y-2 hover:border-white/10 transition-colors">
+                          {(analysisResult.improvementSuggestions || []).map((sug, idx) => (
+                            <div key={idx} className="p-4 bg-slate-950/30 border border-white/5 rounded-2xl flex flex-col space-y-2 hover:border-white/10 transition-colors">
                               <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-semibold text-white">{sug.text}</h4>
-                                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md border uppercase tracking-wider ${sug.color}`}>
+                                <h4 className="text-sm font-semibold text-white">{sug.title}</h4>
+                                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md border uppercase tracking-wider ${
+                                  sug.priority?.toUpperCase() === 'HIGH'
+                                    ? 'text-red-400 bg-red-500/10 border-red-500/20'
+                                    : sug.priority?.toUpperCase() === 'LOW'
+                                    ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+                                    : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                                }`}>
                                   {sug.priority} Priority
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-400 font-light leading-relaxed">{sug.explanation}</p>
+                              <p className="text-xs text-slate-400 font-light leading-relaxed">{sug.description}</p>
                             </div>
                           ))}
                         </div>
@@ -743,7 +703,7 @@ const ResumeAnalyzer = () => {
                           
                           {/* Keywords chip tags */}
                           <div className="flex flex-wrap gap-2.5">
-                            {analysisResult.missingKeywords.map((kw, idx) => (
+                            {(analysisResult.missingKeywords || []).map((kw, idx) => (
                               <div
                                 key={idx}
                                 className="px-3.5 py-1.5 bg-[#080E24] hover:bg-slate-900 border border-indigo-500/20 hover:border-indigo-500/40 rounded-full text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer select-none"
@@ -769,9 +729,9 @@ const ResumeAnalyzer = () => {
                       </h3>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {Object.entries(analysisResult.sectionAnalysis).map(([key, section]) => (
+                        {(analysisResult.sectionAnalysis || []).map((sec, idx) => (
                           <div
-                            key={key}
+                            key={idx}
                             className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-white/20 transition-all duration-300"
                           >
                             {/* Visual glowing separator */}
@@ -779,34 +739,34 @@ const ResumeAnalyzer = () => {
                               className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r"
                               style={{
                                 backgroundImage:
-                                  section.score >= 90
+                                  sec.score >= 90
                                     ? "linear-gradient(to right, transparent, rgba(16, 185, 129, 0.3), transparent)"
                                     : "linear-gradient(to right, transparent, rgba(245, 158, 11, 0.3), transparent)"
                               }}
                             />
                             
                             <div className="flex justify-between items-center pb-3 border-b border-white/5">
-                              <span className="text-sm font-bold text-white capitalize">{key} Analysis</span>
+                              <span className="text-sm font-bold text-white capitalize">{sec.section} Analysis</span>
                               <span
                                 className="text-xs font-semibold px-2 py-0.5 rounded-md border"
                                 style={{
-                                  background: section.score >= 90 ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
-                                  borderColor: section.score >= 90 ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
-                                  color: section.score >= 90 ? "#34d399" : "#fbbf24"
+                                  background: sec.score >= 90 ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
+                                  borderColor: sec.score >= 90 ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
+                                  color: sec.score >= 90 ? "#34d399" : "#fbbf24"
                                 }}
                               >
-                                {section.score}%
+                                {sec.score}%
                               </span>
                             </div>
 
                             <div className="space-y-2.5 mt-3 text-xs">
                               <div>
                                 <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">Parsed Status</span>
-                                <span className="text-xs text-slate-300 font-semibold">{section.status}</span>
+                                <span className="text-xs text-slate-300 font-semibold">{sec.status}</span>
                               </div>
                               <div>
                                 <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">AI Suggestions</span>
-                                <p className="text-xs text-slate-400 leading-relaxed font-light mt-0.5">{section.suggestions}</p>
+                                <p className="text-xs text-slate-400 leading-relaxed font-light mt-0.5">{sec.suggestions}</p>
                               </div>
                             </div>
                           </div>
@@ -824,7 +784,7 @@ const ResumeAnalyzer = () => {
                           Overall AI Recruiter Evaluation Report
                         </h3>
                         <span className="text-sm text-purple-400 font-bold bg-purple-500/10 border border-purple-500/20 px-3 py-1 rounded-xl">
-                          RATING: {analysisResult.overallFeedback.rating}
+                          RATING: {analysisResult.overallReport?.rating.toString().includes('/') ? analysisResult.overallReport.rating : `${analysisResult.overallReport?.rating || 0} / 5.0`}
                         </span>
                       </div>
 
@@ -834,11 +794,11 @@ const ResumeAnalyzer = () => {
                         <div className="space-y-4">
                           <div>
                             <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Key Strengths</span>
-                            <p className="text-sm text-slate-300 leading-relaxed font-light">{analysisResult.overallFeedback.strengths}</p>
+                            <p className="text-sm text-slate-300 leading-relaxed font-light">{analysisResult.overallReport?.strengths}</p>
                           </div>
                           <div>
                             <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Identified Weaknesses</span>
-                            <p className="text-sm text-slate-300 leading-relaxed font-light">{analysisResult.overallFeedback.weaknesses}</p>
+                            <p className="text-sm text-slate-300 leading-relaxed font-light">{analysisResult.overallReport?.weaknesses}</p>
                           </div>
                         </div>
 
@@ -846,11 +806,11 @@ const ResumeAnalyzer = () => {
                         <div className="space-y-4">
                           <div>
                             <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Recruiter Perspective</span>
-                            <p className="text-sm text-slate-300 leading-relaxed font-light">{analysisResult.overallFeedback.recruiterPerspective}</p>
+                            <p className="text-sm text-slate-300 leading-relaxed font-light">{analysisResult.overallReport?.recruiterPerspective}</p>
                           </div>
                           <div className="p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
                             <span className="block text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Final Actionable Advice</span>
-                            <p className="text-xs text-indigo-300 leading-relaxed font-light italic">{analysisResult.overallFeedback.finalRecommendation}</p>
+                            <p className="text-xs text-indigo-300 leading-relaxed font-light italic">{analysisResult.overallReport?.finalAdvice}</p>
                           </div>
                         </div>
 
