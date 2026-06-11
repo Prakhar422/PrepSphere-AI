@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,6 +49,7 @@ const initialHistory = [];
 const ResumeAnalyzer = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -61,7 +62,43 @@ const ResumeAnalyzer = () => {
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStep, setAnalysisStep] = useState("");
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [uploadedResume, setUploadedResume] = useState(null);
+  const [lastAnalysis, setLastAnalysis] = useState(null);
   const [historyList, setHistoryList] = useState(initialHistory);
+
+  // Fetch last scanned resume summary on mount
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const response = await api.get("/resume/history");
+        if (response.data && response.data.success) {
+          const history = response.data.history || [];
+          if (history.length > 0) {
+            setLastAnalysis(history[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching resume history:", err);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  // Handle report loaded from navigation state (View Report action)
+  useEffect(() => {
+    if (location.state?.historyItem && location.state?.resume) {
+      const { historyItem, resume } = location.state;
+      setUploadedResume(resume);
+      setAnalysisResult(historyItem);
+      setSelectedFile({
+        name: resume.resumeName,
+        size: "Verified Archive",
+        rawFile: null
+      });
+      // Clear location state so it doesn't reload on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Navigation Links
   const navItems = [
@@ -125,6 +162,7 @@ const ResumeAnalyzer = () => {
   const handleRemoveFile = () => {
     setSelectedFile(null);
     setAnalysisResult(null);
+    setUploadedResume(null);
   };
 
   // Upload resume and trigger analysis
@@ -171,7 +209,15 @@ const ResumeAnalyzer = () => {
         setIsAnalyzing(false);
         
         // Display real Gemini analysis returned by the backend
+        setUploadedResume(backendResume);
         setAnalysisResult(response.data.analysis);
+
+        // Update lastAnalysis state for the compact card
+        setLastAnalysis({
+          resumeName: backendResume.resumeName,
+          createdAt: backendResume.createdAt,
+          atsScore: response.data.analysis.atsAnalysis?.score || 0
+        });
 
         // Add to history list using backend resume and analysis values
         const newHistoryItem = {
@@ -200,7 +246,73 @@ const ResumeAnalyzer = () => {
       size: "Verified Archive",
       rawFile: null
     });
+    setUploadedResume({
+      id: item.id,
+      resumeName: item.name,
+      resumeUrl: item.data?.documentSource?.cloudinaryUrl || item.data?.resumeUrl || "",
+      fileSize: item.data?.documentSource?.fileSize || item.data?.fileSize || 0
+    });
     setAnalysisResult(item.data);
+  };
+
+  const handleOpenResume = () => {
+    if (!uploadedResume) {
+      alert("Resume URL not found.");
+      return;
+    }
+    const url = uploadedResume.resumeUrl;
+    if (!url) {
+      alert("Resume URL not found.");
+      return;
+    }
+    let isValid = false;
+    try {
+      new URL(url);
+      isValid = true;
+    } catch (e) {
+      isValid = false;
+    }
+    if (!isValid) {
+      alert("Resume URL is invalid.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDownloadResume = () => {
+    if (!uploadedResume) {
+      alert("Unable to download the resume.");
+      return;
+    }
+    const url = uploadedResume.resumeUrl;
+    const name = uploadedResume.resumeName;
+    if (!url) {
+      alert("Unable to download the resume.");
+      return;
+    }
+    let isValid = false;
+    try {
+      new URL(url);
+      isValid = true;
+    } catch (e) {
+      isValid = false;
+    }
+    if (!isValid) {
+      alert("Resume URL is invalid.");
+      return;
+    }
+
+    try {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name || "resume.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("Unable to download the resume.");
+    }
   };
 
   const deleteHistoryItem = (id, e) => {
@@ -571,35 +683,62 @@ const ResumeAnalyzer = () => {
                             <FileCheck className="w-5 h-5 text-purple-400" />
                             Document Source
                           </h3>
-                          <span className="text-xs text-slate-400 truncate max-w-[180px] font-mono">{selectedFile.name}</span>
+                          <span className="text-xs text-slate-400 truncate max-w-[180px] font-mono">
+                            {uploadedResume ? (uploadedResume.resumeName || 'No file uploaded') : 'No file uploaded'}
+                          </span>
                         </div>
 
-                        {/* Visual Mock PDF display */}
-                        <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-950/30 border border-white/5 rounded-2xl my-4 relative group overflow-hidden">
-                          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3.5 z-10">
-                            <button className="p-2.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white hover:border-white/25 transition-all cursor-pointer">
-                              <ZoomIn className="w-4 h-4" />
-                            </button>
-                            <button className="p-2.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white hover:border-white/25 transition-all cursor-pointer">
-                              <ZoomOut className="w-4 h-4" />
-                            </button>
-                            <button className="p-2.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white hover:border-white/25 transition-all cursor-pointer">
-                              <Maximize2 className="w-4 h-4" />
-                            </button>
+                        {!uploadedResume ? (
+                          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                            No resume available.
                           </div>
-                          
-                          <FileText className="w-12 h-12 text-slate-500 mb-2" />
-                          <span className="text-sm font-semibold text-white">Resume Preview Mock</span>
-                          <span className="text-xs text-slate-400 mt-1 font-mono">PDF rendering active | {selectedFile.size}</span>
-                        </div>
+                        ) : (
+                          <>
+                            {/* Visual Mock PDF display */}
+                            <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-950/30 border border-white/5 rounded-2xl my-4 relative group overflow-hidden">
+                              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3.5 z-10">
+                                <button 
+                                  onClick={handleOpenResume}
+                                  className="p-2.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white hover:border-white/25 transition-all cursor-pointer"
+                                  title="Open Resume"
+                                >
+                                  <ZoomIn className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={handleOpenResume}
+                                  className="p-2.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white hover:border-white/25 transition-all cursor-pointer"
+                                  title="Zoom Out"
+                                >
+                                  <ZoomOut className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={handleOpenResume}
+                                  className="p-2.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white hover:border-white/25 transition-all cursor-pointer"
+                                  title="Maximize"
+                                >
+                                  <Maximize2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                              
+                              <FileText className="w-12 h-12 text-slate-500 mb-2" />
+                              <span className="text-sm font-semibold text-white">{uploadedResume.resumeName || 'Resume Preview Mock'}</span>
+                              <span className="text-xs text-slate-400 mt-1 font-mono">
+                                PDF rendering active | {uploadedResume.fileSize ? (typeof uploadedResume.fileSize === 'number' ? `${(uploadedResume.fileSize / 1024).toFixed(1)} KB` : uploadedResume.fileSize) : 'N/A'}
+                              </span>
+                            </div>
 
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-slate-500 font-light">Securely stored in active session</span>
-                          <button className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-bold transition-all cursor-pointer focus:outline-none">
-                            <Download className="w-4.5 h-4.5" />
-                            Download Original
-                          </button>
-                        </div>
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-slate-500 font-light">Securely stored in active session</span>
+                              <button 
+                                onClick={handleDownloadResume}
+                                className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-bold transition-all cursor-pointer focus:outline-none"
+                              >
+                                <Download className="w-4.5 h-4.5" />
+                                Download Original
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                     </div>
@@ -920,90 +1059,35 @@ const ResumeAnalyzer = () => {
               </AnimatePresence>
             )}
 
-            {/* SCAN HISTORY SECTION */}
+            {/* Resume Analysis History Card */}
             <section className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
               <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
               
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-                <Clock className="w-5 h-5 text-indigo-400" />
-                Resume Analysis History
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-indigo-400" />
+                    Resume Analysis History
+                  </h3>
+                  {lastAnalysis ? (
+                    <div className="text-sm text-slate-400 mt-2">
+                      <span className="font-medium text-slate-300">Last Analysis:</span>{" "}
+                      <span className="font-mono text-slate-200">{lastAnalysis.resumeName}</span>{" "}
+                      <span className="text-slate-500">•</span> {new Date(lastAnalysis.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{" "}
+                      <span className="text-slate-500">•</span>{" "}
+                      <span className="font-bold text-indigo-400">{lastAnalysis.atsScore || lastAnalysis.atsAnalysis?.score || 0}% ATS</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic mt-2">No previous resume analysis found.</p>
+                  )}
+                </div>
 
-              <div className="overflow-x-auto w-full">
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr className="border-b border-white/5 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                      <th className="py-3 px-4">Resume Name</th>
-                      <th className="py-3 px-4">Upload Date</th>
-                      <th className="py-3 px-4 text-center">ATS Score</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historyList.map((hist) => (
-                      <tr
-                        key={hist.id}
-                        onClick={() => loadHistoryItem(hist)}
-                        className="border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer group"
-                      >
-                        <td className="py-3.5 px-4 font-semibold text-white flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-indigo-400" />
-                          {hist.name}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-400">{hist.date}</td>
-                        <td className="py-3.5 px-4 text-center font-bold text-indigo-400">{hist.score}%</td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className="px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider"
-                            style={{
-                              background: hist.score >= 80 ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
-                              borderColor: hist.score >= 80 ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
-                              color: hist.score >= 80 ? "#34d399" : "#fbbf24"
-                            }}
-                          >
-                            {hist.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-3.5">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                loadHistoryItem(hist);
-                              }}
-                              className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 focus:outline-none transition-colors"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                alert("Downloading full AI analysis report for " + hist.name);
-                              }}
-                              className="text-xs font-semibold text-slate-400 hover:text-white focus:outline-none transition-colors"
-                            >
-                              Report
-                            </button>
-                            <button
-                              onClick={(e) => deleteHistoryItem(hist.id, e)}
-                              className="text-slate-500 hover:text-red-400 focus:outline-none transition-colors"
-                            >
-                              <Trash2 className="w-4.5 h-4.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {historyList.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-500 italic">
-                          No scan history found. Select a file above to begin diagnostics.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                <button
+                  onClick={() => navigate("/resume/history")}
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-300 hover:text-indigo-200 text-sm font-semibold transition-all cursor-pointer focus:outline-none"
+                >
+                  View History <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </section>
 

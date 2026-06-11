@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import api from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ResponsiveContainer,
@@ -45,6 +46,29 @@ const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [resumeSummary, setResumeSummary] = useState({ hasResume: false, loading: true });
+
+  useEffect(() => {
+    const fetchResumeSummary = async () => {
+      try {
+        const response = await api.get("/dashboard/resume-summary");
+        if (response.data && response.data.success) {
+          setResumeSummary({
+            hasResume: response.data.hasResume,
+            atsScore: response.data.atsScore,
+            atsLabel: response.data.atsLabel,
+            strengths: response.data.strengths || [],
+            missingKeywords: response.data.missingKeywords || [],
+            loading: false
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching dashboard resume summary:", err);
+        setResumeSummary({ hasResume: false, loading: false });
+      }
+    };
+    fetchResumeSummary();
+  }, []);
 
   // States for interactive UI toggles
   const [reminders, setReminders] = useState({
@@ -465,7 +489,10 @@ const Dashboard = () => {
                     <Play className="w-3.5 h-3.5" />
                     Start Daily Quiz
                   </button>
-                  <button className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] hover:border-white/15 text-white text-sm font-medium cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]">
+                  <button 
+                    onClick={() => navigate("/resume-analyzer")}
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] hover:border-white/15 text-white text-sm font-medium cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  >
                     <FileSearch className="w-3.5 h-3.5 text-indigo-400" />
                     Analyze Resume
                   </button>
@@ -522,11 +549,17 @@ const Dashboard = () => {
                 </div>
                 <div className="mt-4 flex items-baseline space-x-1.5">
                   <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-                    78%
+                    {resumeSummary.loading ? "..." : (resumeSummary.hasResume ? `${resumeSummary.atsScore}%` : "--")}
                   </span>
                 </div>
                 <div className="mt-2 text-sm text-slate-400 font-medium flex items-center gap-1">
-                  <span>Target: 85% Match</span>
+                  <span>
+                    {resumeSummary.loading 
+                      ? "Loading details..." 
+                      : (resumeSummary.hasResume 
+                          ? `Target: 85% Match (${resumeSummary.atsLabel})` 
+                          : "No Resume Analysis Yet")}
+                  </span>
                 </div>
               </motion.div>
 
@@ -812,7 +845,7 @@ const Dashboard = () => {
                       AI Resume Analysis
                     </h3>
                     <span className="text-xs text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md font-bold">
-                      78% ATS
+                      {resumeSummary.loading ? "..." : (resumeSummary.hasResume ? `${resumeSummary.atsScore}% ATS` : "No Analysis")}
                     </span>
                   </div>
 
@@ -823,15 +856,17 @@ const Dashboard = () => {
                         Resume Strengths
                       </span>
                       <div className="flex flex-wrap gap-1.5">
-                        <span className="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold">
-                          ATS Optimized Layout
-                        </span>
-                        <span className="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold">
-                          Strong Project Impact
-                        </span>
-                        <span className="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold">
-                          Logical flow
-                        </span>
+                        {resumeSummary.loading ? (
+                          <span className="text-xs text-slate-500 italic">Loading...</span>
+                        ) : resumeSummary.hasResume && resumeSummary.strengths?.length > 0 ? (
+                          resumeSummary.strengths.slice(0, 3).map((strength, idx) => (
+                            <span key={idx} className="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold">
+                              {strength}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-500 italic">No strengths identified yet.</span>
+                        )}
                       </div>
                     </div>
 
@@ -841,22 +876,27 @@ const Dashboard = () => {
                         Missing Keywords
                       </span>
                       <div className="flex flex-wrap gap-1.5">
-                        <span className="text-xs bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-0.5 rounded-full font-bold">
-                          System Design
-                        </span>
-                        <span className="text-xs bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-0.5 rounded-full font-bold">
-                          Redis Cache
-                        </span>
-                        <span className="text-xs bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-0.5 rounded-full font-bold">
-                          Kubernetes
-                        </span>
+                        {resumeSummary.loading ? (
+                          <span className="text-xs text-slate-500 italic">Loading...</span>
+                        ) : resumeSummary.hasResume && resumeSummary.missingKeywords?.length > 0 ? (
+                          resumeSummary.missingKeywords.slice(0, 3).map((keyword, idx) => (
+                            <span key={idx} className="text-xs bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-0.5 rounded-full font-bold">
+                              {keyword}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-500 italic">No missing keywords found.</span>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="pt-6 border-t border-white/5 mt-4">
-                  <button className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] hover:border-white/15 text-sm font-medium text-slate-200 transition-colors cursor-pointer">
+                  <button 
+                    onClick={() => navigate("/resume-analyzer")}
+                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] hover:border-white/15 text-sm font-medium text-slate-200 transition-colors cursor-pointer"
+                  >
                     <Upload className="w-3.5 h-3.5 text-indigo-400" />
                     Upload New Resume
                   </button>

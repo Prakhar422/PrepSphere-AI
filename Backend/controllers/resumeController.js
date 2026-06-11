@@ -1,5 +1,5 @@
 import ResumeAnalysis from '../models/ResumeAnalysis.js';
-import { uploadToCloudinary } from '../services/cloudinaryUpload.js';
+import { uploadToCloudinary, deleteFromCloudinary } from '../services/cloudinaryUpload.js';
 import { extractTextFromBuffer } from '../services/extractionService.js';
 import { analyzeResumeWithGemini } from '../services/geminiService.js';
 
@@ -220,3 +220,139 @@ export const uploadResumeMetadata = async (req, res, next) => {
     });
   }
 };
+
+/**
+ * @desc    Fetch resume history summaries for the authenticated user
+ * @route   GET /api/resume/history
+ * @access  Private (JWT protected)
+ */
+export const getResumeHistory = async (req, res, next) => {
+  try {
+    const analyses = await ResumeAnalysis.find({ user: req.user._id })
+      .select('_id resumeName createdAt atsAnalysis overallReport analysisStatus resumeUrl fileType fileSize')
+      .sort({ createdAt: -1 });
+
+    const history = analyses.map(doc => ({
+      id: doc._id,
+      resumeName: doc.resumeName,
+      createdAt: doc.createdAt,
+      atsScore: doc.atsAnalysis?.score !== undefined ? doc.atsAnalysis.score : 0,
+      overallRating: doc.overallReport?.rating !== undefined ? doc.overallReport.rating : 0,
+      analysisStatus: doc.analysisStatus || 'completed',
+      resumeUrl: doc.resumeUrl,
+      fileType: doc.fileType,
+      fileSize: doc.fileSize
+    }));
+
+    return res.status(200).json({
+      success: true,
+      history
+    });
+  } catch (error) {
+    console.error('Error in getResumeHistory controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to fetch history: ${error.message}`
+    });
+  }
+};
+
+/**
+ * @desc    Fetch a complete resume analysis record by ID
+ * @route   GET /api/resume/:id
+ * @access  Private (JWT protected)
+ */
+export const getResumeAnalysisById = async (req, res, next) => {
+  try {
+    const doc = await ResumeAnalysis.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Analysis record not found'
+      });
+    }
+
+    // Verify ownership
+    if (doc.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You do not own this analysis record'
+      });
+    }
+
+    const formattedSize = `${(doc.fileSize / 1024).toFixed(1)} KB`;
+    const finalAnalysis = mapAnalysisForFrontend(
+      doc,
+      doc.resumeName,
+      formattedSize,
+      doc.resumeUrl
+    );
+
+    return res.status(200).json({
+      success: true,
+      resume: {
+        id: doc._id,
+        resumeName: doc.resumeName,
+        resumeUrl: doc.resumeUrl,
+        fileSize: doc.fileSize,
+        createdAt: doc.createdAt,
+      },
+      analysis: finalAnalysis
+    });
+  } catch (error) {
+    console.error('Error in getResumeAnalysisById controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to fetch analysis details: ${error.message}`
+    });
+  }
+};
+
+/**
+ * @desc    Delete a resume analysis record and its corresponding Cloudinary file
+ * @route   DELETE /api/resume/:id
+ * @access  Private (JWT protected)
+ */
+export const deleteResumeAnalysis = async (req, res, next) => {
+  try {
+    const doc = await ResumeAnalysis.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Analysis record not found'
+      });
+    }
+
+    // Verify ownership
+    if (doc.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You do not own this analysis record'
+      });
+    }
+
+    // Delete from Cloudinary if public ID is present
+    if (doc.cloudinaryPublicId) {
+      try {
+        await deleteFromCloudinary(doc.cloudinaryPublicId);
+      } catch (cloudinaryErr) {
+        console.warn('Failed to delete resume from Cloudinary during record deletion:', cloudinaryErr);
+      }
+    }
+
+    // Delete from MongoDB
+    await ResumeAnalysis.findByIdAndDelete(req.params.id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Resume analysis and associated storage files deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error in deleteResumeAnalysis controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to delete record: ${error.message}`
+    });
+  }
+};
+

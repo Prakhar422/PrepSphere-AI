@@ -5,6 +5,7 @@ import SignUp from "./pages/SignUp";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
+import ResumeHistory from "./pages/ResumeHistory";
 import OAuthSuccess from "./pages/OAuthSuccess";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -39,6 +40,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <ResumeAnalyzer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resume/history"
+            element={
+              <ProtectedRoute>
+                <ResumeHistory />
               </ProtectedRoute>
             }
           />

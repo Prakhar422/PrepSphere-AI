@@ -38,3 +38,19 @@ export const uploadToCloudinary = (buffer, originalName) => {
     stream.end(buffer);
   });
 };
+
+/**
+ * Deletes a file from Cloudinary using its public_id
+ * @param {string} publicId - The Cloudinary public ID of the resource
+ * @returns {Promise<object>} Resolves with Cloudinary destroy result
+ */
+export const deleteFromCloudinary = async (publicId) => {
+  try {
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+    return result;
+  } catch (error) {
+    console.error('Cloudinary deletion error:', error);
+    throw new Error(`Cloudinary deletion failed: ${error.message}`);
+  }
+};
+
