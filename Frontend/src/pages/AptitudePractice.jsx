@@ -199,6 +199,15 @@ const AptitudePractice = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  // Active quiz state from backend
+  const [attemptId, setAttemptId] = useState(null);
+  const [quizId, setQuizId] = useState(null);
+  const [quizCategory, setQuizCategory] = useState("");
+  const [quizDifficulty, setQuizDifficulty] = useState("");
+  const [questions, setQuestions] = useState([]);
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
+  const [apiError, setApiError] = useState(null);
+
   // Core SPA view control: 'home' | 'setup' | 'loading' | 'quiz' | 'results'
   const [view, setView] = useState("home");
 
@@ -213,6 +222,7 @@ const AptitudePractice = () => {
   // Loading view cycle status message index
   const [loadingStep, setLoadingStep] = useState(0);
   const loadingMessages = [
+    "Preparing your aptitude quiz...",
     "Generating AI Quiz...",
     "Preparing Placement-Oriented Questions...",
     "Selecting Balanced Difficulty...",
@@ -252,8 +262,11 @@ const AptitudePractice = () => {
     { name: "Settings", icon: SettingsIcon, active: false, path: "/settings" },
   ];
 
-  // Trigger loading process simulation
-  const startLoadingQuiz = () => {
+  // Trigger loading process and fetch from backend API
+  const startLoadingQuiz = async () => {
+    if (loadingQuiz) return;
+    setLoadingQuiz(true);
+    setApiError(null);
     setView("loading");
     setLoadingStep(0);
     setAnswers({});
@@ -262,6 +275,34 @@ const AptitudePractice = () => {
     setCurrentQuestionIdx(0);
     setTimeLeft(900);
     setShowHint(false);
+
+    try {
+      const response = await api.post("/aptitude/generate", {
+        category: selectedCategory,
+        difficulty: selectedDifficulty
+      });
+
+      if (response.data && response.data.success) {
+        const data = response.data;
+        setAttemptId(data.attemptId);
+        setQuizId(data.quiz._id);
+        setQuizCategory(data.quiz.category);
+        setQuizDifficulty(data.quiz.difficulty);
+        setQuestions(data.quiz.questions);
+        
+        // Success: Transition to quiz view
+        setView("quiz");
+      } else {
+        throw new Error(response.data?.message || "Failed to retrieve quiz.");
+      }
+    } catch (err) {
+      console.error("Error generating quiz:", err);
+      const errorMessage = err.response?.data?.message || err.message || "Something went wrong while preparing your quiz.";
+      setApiError(errorMessage);
+      setView("setup");
+    } finally {
+      setLoadingQuiz(false);
+    }
   };
 
   // Run cycle through loading state messages
@@ -270,9 +311,7 @@ const AptitudePractice = () => {
       const stepInterval = setInterval(() => {
         setLoadingStep((prev) => {
           if (prev >= loadingMessages.length - 1) {
-            clearInterval(stepInterval);
-            setView("quiz");
-            return prev;
+            return prev; // hold at the last message or wrap
           }
           return prev + 1;
         });
@@ -397,8 +436,9 @@ const AptitudePractice = () => {
   const getQuizMetrics = () => {
     const attempted = Object.keys(answers).length;
     let correctCount = 0;
-    MOCK_QUESTIONS.forEach((q, idx) => {
-      if (answers[idx] === q.correctAnswer) {
+    const activeQuestions = questions && questions.length > 0 ? questions : [];
+    activeQuestions.forEach((q, idx) => {
+      if (q.correctAnswer && answers[idx] === q.correctAnswer) {
         correctCount += 1;
       }
     });
@@ -410,7 +450,7 @@ const AptitudePractice = () => {
   const currentMetrics = getQuizMetrics();
 
   // Progress Bar percentage calculation
-  const progressPercent = ((Object.keys(answers).length) / 10) * 100;
+  const progressPercent = ((Object.keys(answers).length) / (questions.length || 10)) * 100;
 
   return (
     <>
@@ -928,7 +968,7 @@ const AptitudePractice = () => {
                               <h4 className="text-sm font-bold text-white">Quantitative Aptitude</h4>
                               <div className="flex justify-between items-center text-xs text-slate-400">
                                 <span>Attempts: 12</span>
-                                <span>Avg: 780 / Best: 920</span>
+                                <span>Avg: 78% | Best: 92%</span>
                               </div>
                             </div>
                             <div className="mt-4 space-y-1">
@@ -949,16 +989,16 @@ const AptitudePractice = () => {
                               <h4 className="text-sm font-bold text-white">Logical Reasoning</h4>
                               <div className="flex justify-between items-center text-xs text-slate-400">
                                 <span>Attempts: 9</span>
-                                <span>Avg: 820 / Best: 950</span>
+                                <span>Avg: 82% | Best: 95%</span>
                               </div>
                             </div>
                             <div className="mt-4 space-y-1">
                               <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden">
-                                <div className="h-full bg-purple-500 w-[85%]" />
+                                <div className="h-full bg-purple-500 w-[82%]" />
                               </div>
                               <div className="flex justify-between text-[10px] text-slate-500 font-bold">
                                 <span>Progress Stage</span>
-                                <span>85%</span>
+                                <span>82%</span>
                               </div>
                             </div>
                           </div>
@@ -970,16 +1010,16 @@ const AptitudePractice = () => {
                               <h4 className="text-sm font-bold text-white">Verbal Ability</h4>
                               <div className="flex justify-between items-center text-xs text-slate-400">
                                 <span>Attempts: 4</span>
-                                <span>Avg: 880 / Best: 960</span>
+                                <span>Avg: 88% | Best: 96%</span>
                               </div>
                             </div>
                             <div className="mt-4 space-y-1">
                               <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden">
-                                <div className="h-full bg-pink-500 w-[91%]" />
+                                <div className="h-full bg-pink-500 w-[88%]" />
                               </div>
                               <div className="flex justify-between text-[10px] text-slate-500 font-bold">
                                 <span>Progress Stage</span>
-                                <span>91%</span>
+                                <span>88%</span>
                               </div>
                             </div>
                           </div>
@@ -991,7 +1031,7 @@ const AptitudePractice = () => {
                               <h4 className="text-sm font-bold text-white">Data Interpretation</h4>
                               <div className="flex justify-between items-center text-xs text-slate-400">
                                 <span>Attempts: 3</span>
-                                <span>Avg: 600 / Best: 710</span>
+                                <span>Avg: 60% | Best: 71%</span>
                               </div>
                             </div>
                             <div className="mt-4 space-y-1">
@@ -1164,13 +1204,37 @@ const AptitudePractice = () => {
                         </div>
                       </div>
 
+                      {apiError && (
+                        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-left space-y-3">
+                          <p className="text-xs text-red-400 font-bold uppercase tracking-wider">Error Generating Assessment</p>
+                          <p className="text-sm text-slate-300 font-light leading-relaxed">{apiError}</p>
+                          <button
+                            type="button"
+                            onClick={startLoadingQuiz}
+                            className="px-4 py-2 rounded-xl bg-red-500/25 hover:bg-red-500/40 text-white text-xs font-bold transition-all cursor-pointer"
+                          >
+                            Retry Request
+                          </button>
+                        </div>
+                      )}
+
                       {/* Setup Start Button */}
                       <button
                         onClick={startLoadingQuiz}
-                        className="w-full flex items-center justify-center gap-1.5 py-3.5 rounded-2xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-base font-bold transition-all duration-200 cursor-pointer hover:scale-[1.01] shadow-[0_0_30px_rgba(99,102,241,0.25)]"
+                        disabled={loadingQuiz}
+                        className="w-full flex items-center justify-center gap-1.5 py-3.5 rounded-2xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-base font-bold transition-all duration-200 cursor-pointer hover:scale-[1.01] shadow-[0_0_30px_rgba(99,102,241,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Play className="w-5 h-5 fill-white" />
-                        Generate AI Quiz
+                        {loadingQuiz ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5" />
+                            <span>Preparing your aptitude quiz...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-5 h-5 fill-white" />
+                            <span>Start Quiz</span>
+                          </>
+                        )}
                       </button>
                     </div>
 
@@ -1314,13 +1378,13 @@ const AptitudePractice = () => {
                         
                         {/* Question body (handles math blocks and markdown-styled lists/tables) */}
                         <div className="text-sm sm:text-base text-slate-100 font-medium leading-relaxed whitespace-pre-line">
-                          {MOCK_QUESTIONS[currentQuestionIdx].text}
+                          {questions[currentQuestionIdx]?.question || ""}
                         </div>
                       </div>
 
                       {/* Options Grid */}
                       <div className="grid grid-cols-1 gap-3.5 mt-8">
-                        {MOCK_QUESTIONS[currentQuestionIdx].options.map((opt) => {
+                        {(questions[currentQuestionIdx]?.options || []).map((opt) => {
                           const isSelected = answers[currentQuestionIdx] === opt.key;
                           return (
                             <button
@@ -1395,7 +1459,7 @@ const AptitudePractice = () => {
                             onClick={() => setView("results")}
                             className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-xs font-black shadow-lg shadow-indigo-500/25 transition-all cursor-pointer w-full sm:w-auto hover:scale-[1.01]"
                           >
-                            Finish Quiz
+                            Submit
                           </button>
                         ) : (
                           <button
@@ -1483,7 +1547,7 @@ const AptitudePractice = () => {
 
                       {/* Circle Grid */}
                       <div className="grid grid-cols-5 gap-2.5 justify-items-center">
-                        {MOCK_QUESTIONS.map((_, idx) => {
+                        {questions.map((_, idx) => {
                           const isCurrent = currentQuestionIdx === idx;
                           const isAnswered = answers[idx] !== undefined;
                           const isSkipped = skippedQuestions[idx] === true;
@@ -1552,7 +1616,7 @@ const AptitudePractice = () => {
                       {showHint ? (
                         <div className="space-y-3">
                           <p className="text-xs text-indigo-300 font-light leading-relaxed font-mono">
-                            {MOCK_QUESTIONS[currentQuestionIdx].hint}
+                            {questions[currentQuestionIdx]?.hint || "No solve approach hint available. Use your logical reasoning and core concepts to solve this problem."}
                           </p>
                           <button
                             type="button"
@@ -1619,7 +1683,7 @@ const AptitudePractice = () => {
                           
                           {/* Palette elements copied for drawer */}
                           <div className="grid grid-cols-5 gap-2.5 justify-items-center py-2">
-                            {MOCK_QUESTIONS.map((_, idx) => {
+                            {questions.map((_, idx) => {
                               const isCurrent = currentQuestionIdx === idx;
                               const isAnswered = answers[idx] !== undefined;
                               const isSkipped = skippedQuestions[idx] === true;
@@ -1704,13 +1768,13 @@ const AptitudePractice = () => {
                     <div className="text-left space-y-4 pt-4">
                       <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">Detailed Solution Review</h3>
                       <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
-                        {MOCK_QUESTIONS.map((q, idx) => {
+                        {questions.map((q, idx) => {
                           const isCorrect = answers[idx] === q.correctAnswer;
                           const wasSkipped = answers[idx] === undefined;
                           return (
-                            <div key={q.id} className="p-4 bg-slate-950/40 border border-white/5 rounded-xl space-y-2">
+                            <div key={q._id || idx} className="p-4 bg-slate-950/40 border border-white/5 rounded-xl space-y-2">
                               <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-slate-400 font-mono">Question {q.id}</span>
+                                <span className="text-xs font-bold text-slate-400 font-mono">Question {idx + 1}</span>
                                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                                   wasSkipped ? "text-amber-400 bg-amber-500/10" :
                                   isCorrect ? "text-emerald-400 bg-emerald-500/10" :
@@ -1719,13 +1783,13 @@ const AptitudePractice = () => {
                                   {wasSkipped ? "Skipped" : isCorrect ? "Correct" : "Incorrect"}
                                 </span>
                               </div>
-                              <p className="text-xs text-white font-medium leading-relaxed whitespace-pre-line">{q.text}</p>
+                              <p className="text-xs text-white font-medium leading-relaxed whitespace-pre-line">{q.question || ""}</p>
                               <div className="text-[11px] space-y-1 pt-1.5 border-t border-white/5">
                                 <div className="text-slate-400">
-                                  Your Option: <strong className="text-white font-semibold font-mono">{answers[idx] || "None"}</strong> | Correct Option: <strong className="text-emerald-400 font-semibold font-mono">{q.correctAnswer}</strong>
+                                  Your Option: <strong className="text-white font-semibold font-mono">{answers[idx] || "None"}</strong> | Correct Option: <strong className="text-emerald-400 font-semibold font-mono">{q.correctAnswer || "A"}</strong>
                                 </div>
                                 <div className="text-indigo-300 font-light leading-relaxed">
-                                  <strong>Explanation:</strong> {q.explanation}
+                                  <strong>Explanation:</strong> {q.explanation || "Correct option explanation."}
                                 </div>
                               </div>
                             </div>

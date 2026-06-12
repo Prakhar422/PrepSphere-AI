@@ -91,13 +91,13 @@ const Dashboard = () => {
 
   // Recharts BarChart Mock Data (Weekly Aptitude)
   const aptitudeData = [
-    { name: "Mon", score: 650 },
-    { name: "Tue", score: 720 },
-    { name: "Wed", score: 850 },
-    { name: "Thu", score: 780 },
-    { name: "Fri", score: 900 },
-    { name: "Sat", score: 950 },
-    { name: "Sun", score: 850 },
+    { name: "Mon", score: 65 },
+    { name: "Tue", score: 72 },
+    { name: "Wed", score: 85 },
+    { name: "Thu", score: 78 },
+    { name: "Fri", score: 90 },
+    { name: "Sat", score: 95 },
+    { name: "Sun", score: 85 },
   ];
 
   // Sidebar navigation items

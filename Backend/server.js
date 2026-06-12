@@ -5,6 +5,7 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import resumeRoutes from './routes/resumeRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import aptitudeRoutes from './routes/aptitudeRoutes.js';
 
 
 // Load environment variables
@@ -29,6 +30,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/aptitude', aptitudeRoutes);
 
 // Fallback Route (404 Not Found)
 app.use((req, res, next) => {
