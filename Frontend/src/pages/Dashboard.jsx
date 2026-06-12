@@ -515,7 +515,7 @@ const Dashboard = () => {
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
                   <span className="text-lg font-semibold text-slate-300">
-                    Aptitude Score
+                    Overall Aptitude Score
                   </span>
                   <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
                     <Brain className="w-4 h-4" />
@@ -523,9 +523,9 @@ const Dashboard = () => {
                 </div>
                 <div className="mt-4 flex items-baseline space-x-1.5">
                   <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-                    850
+                    87
                   </span>
-                  <span className="text-sm text-slate-400">/ 1000</span>
+                  <span className="text-sm text-slate-400">/ 100</span>
                 </div>
                 <div className="mt-2 text-sm text-emerald-400 font-semibold flex items-center gap-1">
                   <TrendingUp className="w-3 h-3" />

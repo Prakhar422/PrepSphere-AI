@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
 import ResumeHistory from "./pages/ResumeHistory";
+import AptitudePractice from "./pages/AptitudePractice";
 import OAuthSuccess from "./pages/OAuthSuccess";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -51,6 +52,14 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/aptitude-practice"
+            element={
+              <ProtectedRoute>
+                <AptitudePractice />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
@@ -58,3 +67,4 @@ const App = () => {
 };
 
 export default App;
+
