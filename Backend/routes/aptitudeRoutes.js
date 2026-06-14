@@ -6,13 +6,21 @@ import {
   getQuizHistory,
   getQuizAttempt,
   deleteQuizAttempt,
-  getCategoryAnalytics
+  getCategoryAnalytics,
+  getDashboardData,
+  getQuestionOfTheDay
 } from '../controllers/aptitudeController.js';
 
 const router = express.Router();
 
 // Route Configuration: Aptitude Practice Quizzes
 // All endpoints are private and require JWT authentication
+
+// GET /api/aptitude/question-of-the-day - Retrieve calendar Question of the Day
+router.get('/question-of-the-day', protect, getQuestionOfTheDay);
+
+// GET /api/aptitude/dashboard - Retrieve dynamic dashboard metrics aggregation
+router.get('/dashboard', protect, getDashboardData);
 
 // GET /api/aptitude/analytics - Retrieve category performance matrix analytics
 router.get('/analytics', protect, getCategoryAnalytics);

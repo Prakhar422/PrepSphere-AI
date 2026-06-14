@@ -40,6 +40,10 @@ import {
   Upload,
 } from "lucide-react";
 
+const Skeleton = ({ className }) => (
+  <div className={`animate-pulse bg-white/[0.03] border border-white/5 rounded-xl ${className}`} />
+);
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -47,27 +51,106 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [resumeSummary, setResumeSummary] = useState({ hasResume: false, loading: true });
+  const [aptitudeSummary, setAptitudeSummary] = useState({
+    hasAttempts: false,
+    overallScore: 0,
+    weeklyImprovement: null,
+    improvementText: "",
+    readiness: 0,
+    chartData: [],
+    progress: { today: 0, week: 0, month: 0 },
+    loading: true,
+    error: null
+  });
+  const [readinessVal, setReadinessVal] = useState(0);
+  const [activitiesList, setActivitiesList] = useState([]);
+  const [qotd, setQotd] = useState({
+    question: "",
+    category: "",
+    difficulty: "",
+    options: [],
+    questionId: "",
+    loading: true,
+    isEmpty: false,
+    error: null
+  });
 
   useEffect(() => {
-    const fetchResumeSummary = async () => {
+    const fetchDashboardSummary = async () => {
       try {
-        const response = await api.get("/dashboard/resume-summary");
+        const response = await api.get("/dashboard/summary");
         if (response.data && response.data.success) {
           setResumeSummary({
-            hasResume: response.data.hasResume,
-            atsScore: response.data.atsScore,
-            atsLabel: response.data.atsLabel,
-            strengths: response.data.strengths || [],
-            missingKeywords: response.data.missingKeywords || [],
+            hasResume: response.data.resumeSummary.hasResume,
+            atsScore: response.data.resumeSummary.atsScore,
+            atsLabel: response.data.resumeSummary.atsLabel,
+            uploadStatus: response.data.resumeSummary.uploadStatus,
+            strengths: response.data.resumeSummary.strengths || [],
+            missingKeywords: response.data.resumeSummary.missingKeywords || [],
             loading: false
           });
+
+          setAptitudeSummary({
+            hasAttempts: response.data.aptitudeSummary.hasAttempts,
+            overallScore: response.data.aptitudeSummary.overallScore || 0,
+            weeklyImprovement: response.data.aptitudeSummary.weeklyImprovement,
+            improvementText: response.data.aptitudeSummary.improvementText || "",
+            readiness: response.data.aptitudeSummary.readiness || 0,
+            chartData: response.data.aptitudeSummary.chartData || [],
+            progress: response.data.aptitudeSummary.progress || { today: 0, week: 0, month: 0 },
+            loading: false,
+            error: null
+          });
+
+          setReadinessVal(response.data.readiness || 0);
+          setActivitiesList(response.data.activities || []);
         }
       } catch (err) {
-        console.error("Error fetching dashboard resume summary:", err);
+        console.error("Error fetching combined dashboard summary:", err);
         setResumeSummary({ hasResume: false, loading: false });
+        setAptitudeSummary((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Failed to load aptitude summary."
+        }));
       }
     };
-    fetchResumeSummary();
+
+    const fetchQotd = async () => {
+      try {
+        const response = await api.get("/aptitude/question-of-the-day");
+        if (response.data && response.data.success) {
+          if (response.data.isEmpty) {
+            setQotd({
+              loading: false,
+              isEmpty: true,
+              error: null
+            });
+          } else {
+            setQotd({
+              question: response.data.question,
+              category: response.data.category,
+              difficulty: response.data.difficulty,
+              options: response.data.options || [],
+              questionId: response.data.questionId,
+              loading: false,
+              isEmpty: false,
+              error: null
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching dashboard QOTD:", err);
+        setQotd((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Failed to load Question of the Day."
+        }));
+      }
+    };
+
+    fetchDashboardSummary();
+    fetchQotd();
   }, []);
 
   // States for interactive UI toggles
@@ -89,16 +172,23 @@ const Dashboard = () => {
     }));
   };
 
-  // Recharts BarChart Mock Data (Weekly Aptitude)
-  const aptitudeData = [
-    { name: "Mon", score: 65 },
-    { name: "Tue", score: 72 },
-    { name: "Wed", score: 85 },
-    { name: "Thu", score: 78 },
-    { name: "Fri", score: 90 },
-    { name: "Sat", score: 95 },
-    { name: "Sun", score: 85 },
-  ];
+  // Calculation of preparation progress percentages
+  const todayRaw = aptitudeSummary.progress?.today || 0;
+  const weekRaw = aptitudeSummary.progress?.week || 0;
+  const monthRaw = aptitudeSummary.progress?.month || 0;
+
+  const todayPct = Math.min(Math.round((todayRaw / 10) * 100), 100);
+  const weekPct = Math.min(Math.round((weekRaw / 5) * 100), 100);
+  const monthPct = Math.min(Math.round((monthRaw / 20) * 100), 100);
+
+  const iconMap = {
+    FileSearch: FileSearch,
+    Brain: Brain,
+    Sparkles: Sparkles,
+    Calendar: Calendar,
+    Award: Award,
+    Clock: Clock
+  };
 
   // Sidebar navigation items
   const navItems = [
@@ -485,9 +575,12 @@ const Dashboard = () => {
                   using tailored AI modules.
                 </p>
                 <div className="flex flex-wrap gap-3 pt-2">
-                  <button className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-sm font-medium cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                  <button 
+                    onClick={() => navigate("/aptitude-practice")}
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-sm font-medium cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                  >
                     <Play className="w-3.5 h-3.5" />
-                    Start Daily Quiz
+                    {aptitudeSummary.loading ? "..." : (aptitudeSummary.hasAttempts ? "Continue Practice" : "Start Your First Quiz")}
                   </button>
                   <button 
                     onClick={() => navigate("/resume-analyzer")}
@@ -515,22 +608,41 @@ const Dashboard = () => {
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
                   <span className="text-lg font-semibold text-slate-300">
-                    Overall Aptitude Score
+                    Aptitude Score
                   </span>
                   <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
                     <Brain className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="mt-4 flex items-baseline space-x-1.5">
-                  <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-                    87
-                  </span>
-                  <span className="text-sm text-slate-400">/ 100</span>
-                </div>
-                <div className="mt-2 text-sm text-emerald-400 font-semibold flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" />
-                  <span>+12% vs last week</span>
-                </div>
+                {aptitudeSummary.loading ? (
+                  <div className="space-y-3 mt-4">
+                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-4 w-40" />
+                  </div>
+                ) : aptitudeSummary.error ? (
+                  <div className="mt-4 text-xs text-red-400">{aptitudeSummary.error}</div>
+                ) : (
+                  <>
+                    <div className="mt-4 flex items-baseline space-x-1.5">
+                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+                        {aptitudeSummary.overallScore}
+                      </span>
+                      <span className="text-sm text-slate-400">/ 100</span>
+                    </div>
+                    <div className="mt-2 text-sm font-semibold flex items-center gap-1">
+                      {aptitudeSummary.weeklyImprovement !== null && (
+                        <TrendingUp className={`w-3 h-3 ${aptitudeSummary.weeklyImprovement >= 0 ? "text-emerald-400" : "text-red-400"}`} />
+                      )}
+                      <span className={
+                        aptitudeSummary.weeklyImprovement !== null
+                          ? (aptitudeSummary.weeklyImprovement >= 0 ? "text-emerald-400" : "text-red-400")
+                          : "text-slate-400 font-light"
+                      }>
+                        {aptitudeSummary.improvementText}
+                      </span>
+                    </div>
+                  </>
+                )}
               </motion.div>
 
               {/* Card 2: Resume ATS Score */}
@@ -547,20 +659,27 @@ const Dashboard = () => {
                     <FileSearch className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="mt-4 flex items-baseline space-x-1.5">
-                  <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-                    {resumeSummary.loading ? "..." : (resumeSummary.hasResume ? `${resumeSummary.atsScore}%` : "--")}
-                  </span>
-                </div>
-                <div className="mt-2 text-sm text-slate-400 font-medium flex items-center gap-1">
-                  <span>
-                    {resumeSummary.loading 
-                      ? "Loading details..." 
-                      : (resumeSummary.hasResume 
+                {resumeSummary.loading ? (
+                  <div className="space-y-3 mt-4">
+                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-4 w-40" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 flex items-baseline space-x-1.5">
+                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+                        {resumeSummary.hasResume ? `${resumeSummary.atsScore}%` : "--"}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm text-slate-400 font-medium flex items-center gap-1">
+                      <span>
+                        {resumeSummary.hasResume 
                           ? `Target: 85% Match (${resumeSummary.atsLabel})` 
-                          : "No Resume Analysis Yet")}
-                  </span>
-                </div>
+                          : "Resume not analyzed yet. Upload your resume to calculate your ATS score."}
+                      </span>
+                    </div>
+                  </>
+                )}
               </motion.div>
 
               {/* Card 3: Global Coding Rank */}
@@ -614,16 +733,14 @@ const Dashboard = () => {
 
             {/* ANALYTICS CONTAINER ROW */}
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Chart 1: Weekly Aptitude Performance (7 columns) */}
+              {/* Chart 1: Recent Aptitude Performance (7 columns) */}
               <div className="lg:col-span-7 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between h-[380px] shadow-lg">
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                      Performance Analysis
-                    </span>
-                    <h3 className="text-lg font-semibold text-white">
-                      Weekly Aptitude Performance
+                    
+                    <h3 className="text-lg font-semibold text-white mt-0.5">
+                      Recent Aptitude Performance
                     </h3>
                   </div>
                   <span className="text-xs text-indigo-400 font-bold bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded-lg">
@@ -631,93 +748,127 @@ const Dashboard = () => {
                   </span>
                 </div>
 
-                <div className="flex-1 w-full relative">
-                  <ResponsiveContainer width="100%" height="95%">
-                    <BarChart
-                      data={aptitudeData}
-                      margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                {aptitudeSummary.loading ? (
+                  <div className="flex-1 flex flex-col justify-center space-y-4">
+                    <Skeleton className="h-4 w-1/3 mx-auto" />
+                    <div className="flex justify-between items-end h-[160px] px-4">
+                      <Skeleton className="h-[40px] w-[8%]" />
+                      <Skeleton className="h-[80px] w-[8%]" />
+                      <Skeleton className="h-[120px] w-[8%]" />
+                      <Skeleton className="h-[60px] w-[8%]" />
+                      <Skeleton className="h-[140px] w-[8%]" />
+                      <Skeleton className="h-[150px] w-[8%]" />
+                      <Skeleton className="h-[90px] w-[8%]" />
+                    </div>
+                  </div>
+                ) : aptitudeSummary.error ? (
+                  <div className="flex-1 flex items-center justify-center text-sm text-red-400">
+                    {aptitudeSummary.error}
+                  </div>
+                ) : !aptitudeSummary.hasAttempts || aptitudeSummary.chartData.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-slate-950/20 rounded-2xl border border-dashed border-white/5 mt-2">
+                    <Brain className="w-10 h-10 text-indigo-500/40 mb-3 animate-pulse" />
+                    <h4 className="text-sm font-semibold text-white">No Assessment History</h4>
+                    <p className="text-xs text-slate-400 max-w-sm mt-1">
+                      Start your first aptitude quiz to begin tracking your progress.
+                    </p>
+                    <button
+                      onClick={() => navigate("/aptitude-practice")}
+                      className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer"
                     >
-                      <XAxis
-                        dataKey="name"
-                        stroke="#64748b"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        stroke="#64748b"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          fontSize: "13px",
-                          background: "#080E24",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
-                          borderRadius: "12px",
-                        }}
-                        labelStyle={{
-                          color: "#ffffff",
-                        }}
-                        itemStyle={{
-                          color: "#ffffff",
-                        }}
-                        cursor={{ fill: "rgba(255, 255, 255, 0.015)" }}
-                      />
-                      <Bar dataKey="score" radius={[8, 8, 0, 0]}>
-                        {aptitudeData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={
-                              index === 4 || index === 5
-                                ? "url(#active-bar)"
-                                : "url(#default-bar)"
-                            }
-                          />
-                        ))}
-                      </Bar>
-                      <defs>
-                        <linearGradient
-                          id="default-bar"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="#4f46e5"
-                            stopOpacity="0.8"
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="#6366f1"
-                            stopOpacity="0.2"
-                          />
-                        </linearGradient>
-                        <linearGradient
-                          id="active-bar"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="#a855f7"
-                            stopOpacity="0.9"
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="#ec4899"
-                            stopOpacity="0.3"
-                          />
-                        </linearGradient>
-                      </defs>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                      Start Quiz
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex-1 w-full relative">
+                    <ResponsiveContainer width="100%" height="95%">
+                      <BarChart
+                        data={aptitudeSummary.chartData}
+                        margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                      >
+                        <XAxis
+                          dataKey="name"
+                          stroke="#64748b"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          stroke="#64748b"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                          domain={[0, 100]}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            fontSize: "13px",
+                            background: "#080E24",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            borderRadius: "12px",
+                          }}
+                          labelStyle={{
+                            color: "#ffffff",
+                          }}
+                          itemStyle={{
+                            color: "#ffffff",
+                          }}
+                          cursor={{ fill: "rgba(255, 255, 255, 0.015)" }}
+                        />
+                        <Bar dataKey="score" radius={[8, 8, 0, 0]}>
+                          {aptitudeSummary.chartData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={
+                                index === aptitudeSummary.chartData.length - 1
+                                  ? "url(#active-bar)"
+                                  : "url(#default-bar)"
+                              }
+                            />
+                          ))}
+                        </Bar>
+                        <defs>
+                          <linearGradient
+                            id="default-bar"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#4f46e5"
+                              stopOpacity="0.8"
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="#6366f1"
+                              stopOpacity="0.2"
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id="active-bar"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#a855f7"
+                              stopOpacity="0.9"
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="#ec4899"
+                              stopOpacity="0.3"
+                            />
+                          </linearGradient>
+                        </defs>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
 
               {/* Chart 2: Placement Readiness Circular Gauge (5 columns) */}
@@ -753,7 +904,7 @@ const Dashboard = () => {
                         className="text-transparent"
                         strokeWidth="6"
                         strokeDasharray={289}
-                        strokeDashoffset={289 - (289 * 78) / 100}
+                        strokeDashoffset={289 - (289 * (resumeSummary.loading || aptitudeSummary.loading ? 0 : readinessVal)) / 100}
                         strokeLinecap="round"
                         stroke="url(#readiness-gradient)"
                         fill="transparent"
@@ -774,7 +925,7 @@ const Dashboard = () => {
                     </svg>
                     <div className="absolute text-center">
                       <span className="text-2xl font-black text-white">
-                        78%
+                        {resumeSummary.loading || aptitudeSummary.loading ? "..." : `${readinessVal}%`}
                       </span>
                       <span className="block text-[10px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">
                         READY
@@ -787,40 +938,50 @@ const Dashboard = () => {
                     <div>
                       <div className="flex justify-between text-slate-400 text-sm mb-1">
                         <span>Aptitude</span>
-                        <span className="font-bold text-slate-300">80%</span>
+                        <span className="font-bold text-slate-300">
+                          {aptitudeSummary.loading ? "..." : (aptitudeSummary.hasAttempts ? `${aptitudeSummary.readiness}%` : "0%")}
+                        </span>
                       </div>
                       <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 w-[80%]" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-slate-400 text-sm mb-1">
-                        <span>DSA &amp; Logic</span>
-                        <span className="font-bold text-slate-300">75%</span>
-                      </div>
-                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-500 w-[75%]" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-slate-400 text-sm mb-1">
-                        <span>Communication</span>
-                        <span className="font-bold text-slate-300">85%</span>
-                      </div>
-                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-purple-500 w-[85%]" />
+                        <div 
+                          className="h-full bg-blue-500 transition-all duration-500" 
+                          style={{ width: `${aptitudeSummary.loading ? 0 : (aptitudeSummary.hasAttempts ? aptitudeSummary.readiness : 0)}%` }}
+                        />
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between text-slate-400 text-sm mb-1">
                         <span>Resume Scan</span>
-                        <span className="font-bold text-slate-300">72%</span>
+                        <span className="font-bold text-slate-300">
+                          {resumeSummary.loading ? "..." : (resumeSummary.hasResume ? `${resumeSummary.atsScore}%` : "0%")}
+                        </span>
                       </div>
                       <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-pink-500 w-[72%]" />
+                        <div 
+                          className="h-full bg-pink-500 transition-all duration-500" 
+                          style={{ width: `${resumeSummary.loading ? 0 : (resumeSummary.hasResume ? resumeSummary.atsScore : 0)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-slate-400 text-sm mb-1">
+                        <span>DSA &amp; Logic</span>
+                        <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Coming Soon</span>
+                      </div>
+                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden opacity-40">
+                        <div className="h-full bg-slate-700" style={{ width: "0%" }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-slate-400 text-sm mb-1">
+                        <span>Communication</span>
+                        <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Coming Soon</span>
+                      </div>
+                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden opacity-40">
+                        <div className="h-full bg-slate-700" style={{ width: "0%" }} />
                       </div>
                     </div>
                   </div>
@@ -838,7 +999,7 @@ const Dashboard = () => {
               <div className="lg:col-span-6 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
 
-                <div className="space-y-4">
+                <div className="space-y-4 flex-1">
                   <div className="flex justify-between items-center pb-3 border-b border-white/5">
                     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                       <FileSearch className="w-4 h-4 text-indigo-400" />
@@ -849,47 +1010,64 @@ const Dashboard = () => {
                     </span>
                   </div>
 
-                  <div className="space-y-3">
-                    {/* Strengths */}
-                    <div>
-                      <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">
-                        Resume Strengths
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {resumeSummary.loading ? (
-                          <span className="text-xs text-slate-500 italic">Loading...</span>
-                        ) : resumeSummary.hasResume && resumeSummary.strengths?.length > 0 ? (
-                          resumeSummary.strengths.slice(0, 3).map((strength, idx) => (
-                            <span key={idx} className="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold">
-                              {strength}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-slate-500 italic">No strengths identified yet.</span>
-                        )}
+                  {resumeSummary.loading ? (
+                    <div className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-1/4" />
+                        <div className="flex gap-2"><Skeleton className="h-6 w-20" /><Skeleton className="h-6 w-24" /></div>
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-1/3" />
+                        <div className="flex gap-2"><Skeleton className="h-6 w-24" /><Skeleton className="h-6 w-16" /></div>
                       </div>
                     </div>
+                  ) : !resumeSummary.hasResume ? (
+                    <div className="py-6 text-center">
+                      <FileSearch className="w-10 h-10 text-indigo-500/30 mx-auto mb-3" />
+                      <h4 className="text-sm font-semibold text-white">No Resume Analysis Yet</h4>
+                      <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                        Resume not analyzed yet. Upload your resume to calculate your ATS score.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Strengths */}
+                      <div>
+                        <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">
+                          Resume Strengths
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {resumeSummary.strengths?.length > 0 ? (
+                            resumeSummary.strengths.slice(0, 3).map((strength, idx) => (
+                              <span key={idx} className="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold">
+                                {strength}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-500 italic">No strengths identified yet.</span>
+                          )}
+                        </div>
+                      </div>
 
-                    {/* Missing Keywords */}
-                    <div>
-                      <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">
-                        Missing Keywords
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {resumeSummary.loading ? (
-                          <span className="text-xs text-slate-500 italic">Loading...</span>
-                        ) : resumeSummary.hasResume && resumeSummary.missingKeywords?.length > 0 ? (
-                          resumeSummary.missingKeywords.slice(0, 3).map((keyword, idx) => (
-                            <span key={idx} className="text-xs bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-0.5 rounded-full font-bold">
-                              {keyword}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-slate-500 italic">No missing keywords found.</span>
-                        )}
+                      {/* Missing Keywords */}
+                      <div>
+                        <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">
+                          Missing Keywords
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {resumeSummary.missingKeywords?.length > 0 ? (
+                            resumeSummary.missingKeywords.slice(0, 3).map((keyword, idx) => (
+                              <span key={idx} className="text-xs bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-0.5 rounded-full font-bold">
+                                {keyword}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-500 italic">No missing keywords found.</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="pt-6 border-t border-white/5 mt-4">
@@ -951,17 +1129,17 @@ const Dashboard = () => {
 
             {/* DAILY CHALLENGES SECTION */}
             <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Daily Challenge 1: Aptitude */}
+              {/* Daily Challenge 1: Aptitude QOTD */}
               <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
                 <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent pointer-events-none" />
 
-                <div className="space-y-4">
+                <div className="space-y-4 flex-1">
                   <div className="flex justify-between items-center pb-2.5 border-b border-white/5">
                     <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                      Aptitude QOTD
+                      {qotd.loading ? "..." : (qotd.isEmpty ? "Aptitude" : qotd.category)}
                     </span>
                     <span className="text-xs text-slate-400 font-medium">
-                      Difficulty: Medium
+                      Difficulty: {qotd.loading ? "..." : (qotd.isEmpty ? "--" : qotd.difficulty)}
                     </span>
                   </div>
 
@@ -969,17 +1147,65 @@ const Dashboard = () => {
                     <h4 className="text-lg font-semibold text-white">
                       Question of the Day
                     </h4>
-                    <p className="text-sm text-slate-300 font-light leading-relaxed">
-                      A train traveling at 60 km/hr crosses a platform of length
-                      250 meters in 24 seconds. Find the absolute length of the
-                      train in meters.
-                    </p>
+                    {qotd.loading ? (
+                      <div className="space-y-3 mt-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-5/6" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                        </div>
+                      </div>
+                    ) : qotd.error ? (
+                      <p className="text-sm text-red-400 py-4">{qotd.error}</p>
+                    ) : qotd.isEmpty ? (
+                      <div className="py-4 text-center">
+                        <Brain className="w-8 h-8 text-indigo-500/30 mx-auto mb-2" />
+                        <p className="text-sm text-slate-400 font-semibold">Question Bank Empty</p>
+                        <p className="text-xs text-slate-500 mt-1">Generate aptitude quizzes first.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-slate-300 font-light leading-relaxed">
+                          {qotd.question}
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3">
+                          {qotd.options.map((option, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center px-4 py-2.5 rounded-xl bg-slate-950/40 border border-white/5 text-sm text-slate-300 select-none hover:border-white/10 transition-colors"
+                            >
+                              <span className="font-bold text-indigo-400 mr-2">{option.key}.</span>
+                              <span>{option.text}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center space-x-2 text-xs text-slate-400 mt-4">
+                          <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>
+                            Estimated Time: {
+                              qotd.difficulty === "Easy" ? "30–60 sec" :
+                              qotd.difficulty === "Hard" || qotd.difficulty === "Adaptive" ? "90–120 sec" :
+                              "60–90 sec"
+                            }
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 <div className="pt-6 border-t border-white/5 mt-4">
-                  <button className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-600/10 border border-indigo-500/20 hover:border-indigo-500/40 hover:bg-indigo-500/20 text-sm font-medium text-indigo-300 rounded-xl transition-all duration-200 cursor-pointer">
-                    Solve Now
+                  <button
+                    onClick={() => navigate("/aptitude-practice")}
+                    disabled={qotd.loading || qotd.isEmpty}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-600/10 border border-indigo-500/20 hover:border-indigo-500/40 hover:bg-indigo-500/20 disabled:opacity-50 disabled:pointer-events-none text-sm font-medium text-indigo-300 rounded-xl transition-all duration-200 cursor-pointer"
+                  >
+                    Practice Now
                   </button>
                 </div>
               </div>
@@ -1097,40 +1323,60 @@ const Dashboard = () => {
                     Preparation Progress
                   </h3>
 
-                  <div className="space-y-3">
-                    {/* Goal 1 */}
-                    <div>
-                      <div className="flex justify-between text-sm text-slate-400 mb-1">
-                        <span>Today's Goal Completion</span>
-                        <span className="font-bold text-slate-300">80%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 w-[80%]" />
-                      </div>
+                  {aptitudeSummary.loading ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="space-y-2">
+                          <Skeleton className="h-4 w-1/3" />
+                          <Skeleton className="h-2 w-full" />
+                        </div>
+                      ))}
                     </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Goal 1 */}
+                      <div>
+                        <div className="flex justify-between text-sm text-slate-400 mb-1">
+                          <span>Today's Practice ({todayRaw} Qs)</span>
+                          <span className="font-bold text-slate-300">{todayPct}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500" 
+                            style={{ width: `${todayPct}%` }}
+                          />
+                        </div>
+                      </div>
 
-                    {/* Goal 2 */}
-                    <div>
-                      <div className="flex justify-between text-sm text-slate-400 mb-1">
-                        <span>Weekly Target Progress</span>
-                        <span className="font-bold text-slate-300">65%</span>
+                      {/* Goal 2 */}
+                      <div>
+                        <div className="flex justify-between text-sm text-slate-400 mb-1">
+                          <span>Weekly Progress ({weekRaw} {weekRaw === 1 ? 'quiz' : 'quizzes'})</span>
+                          <span className="font-bold text-slate-300">{weekPct}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500" 
+                            style={{ width: `${weekPct}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 w-[65%]" />
-                      </div>
-                    </div>
 
-                    {/* Goal 3 */}
-                    <div>
-                      <div className="flex justify-between text-sm text-slate-400 mb-1">
-                        <span>Monthly Target Progress</span>
-                        <span className="font-bold text-slate-300">88%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-pink-500 to-orange-400 w-[88%]" />
+                      {/* Goal 3 */}
+                      <div>
+                        <div className="flex justify-between text-sm text-slate-400 mb-1">
+                          <span>Monthly Progress ({monthRaw} {monthRaw === 1 ? 'quiz' : 'quizzes'})</span>
+                          <span className="font-bold text-slate-300">{monthPct}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-pink-500 to-orange-400 transition-all duration-500" 
+                            style={{ width: `${monthPct}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="mt-5 p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 text-center">
@@ -1200,26 +1446,50 @@ const Dashboard = () => {
                   </h3>
 
                   <div className="space-y-4">
-                    {activities.map((act, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-start space-x-3 text-[14px]"
-                      >
-                        <div
-                          className={`p-1.5 rounded-lg shrink-0 ${act.color}`}
-                        >
-                          <act.icon className="w-4.5 h-4.5" />
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className=" text-slate-300 font-medium leading-snug">
-                            {act.desc}
-                          </p>
-                          <span className="block text-[12px] text-slate-400 font-light">
-                            {act.time}
-                          </span>
-                        </div>
+                    {aptitudeSummary.loading || resumeSummary.loading ? (
+                      <div className="space-y-4">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="flex items-start space-x-3">
+                            <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+                            <div className="space-y-1.5 flex-1">
+                              <Skeleton className="h-4 w-3/4" />
+                              <Skeleton className="h-3 w-1/4" />
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    ) : activitiesList.length === 0 ? (
+                      <p className="text-sm text-slate-400 font-light italic text-center py-4">No recent activity found.</p>
+                    ) : (
+                      activitiesList.slice(0, 5).map((act, idx) => {
+                        const IconComponent = iconMap[act.icon] || Clock;
+                        return (
+                          <div
+                            key={idx}
+                            className="flex items-start space-x-3 text-[14px]"
+                          >
+                            <div
+                              className={`p-1.5 rounded-lg shrink-0 ${act.color}`}
+                            >
+                              <IconComponent className="w-4.5 h-4.5" />
+                            </div>
+                            <div className="space-y-0.5">
+                              <p className="text-slate-300 font-medium leading-snug">
+                                {act.desc}
+                              </p>
+                              {act.detail && (
+                                <p className="text-xs text-indigo-400/90 font-semibold mb-0.5">
+                                  {act.detail}
+                                </p>
+                              )}
+                              <span className="block text-[12px] text-slate-400 font-light">
+                                {act.time}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>

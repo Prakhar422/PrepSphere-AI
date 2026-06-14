@@ -12,33 +12,28 @@ import QuizAttempt from '../models/QuizAttempt.js';
  */
 export const getAvailableQuiz = async (userId, category, difficulty) => {
   // 1. Fetch attempted quiz IDs (only completed attempts) using distinct query
-  const attemptedQuizIds = await QuizAttempt.distinct('quiz', {
+  const completedQuizIds = await QuizAttempt.distinct('quiz', {
     user: userId,
     status: 'COMPLETED'
   });
-  const attemptedQuizIdsStr = attemptedQuizIds.map(id => id.toString());
 
-  // 2. Query all active quizzes for this category and difficulty
-  const availableQuizzes = await QuizBank.find({
+  // 2. Query all active quizzes for this category and difficulty that the user has never completed
+  const unusedQuizzes = await QuizBank.find({
     category,
     difficulty,
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    _id: { $nin: completedQuizIds }
   });
-
-  // 3. Exclude quizzes that have been completed by the current user
-  const unusedQuizzes = availableQuizzes.filter(
-    quiz => !attemptedQuizIdsStr.includes(quiz._id.toString())
-  );
 
   if (unusedQuizzes.length === 0) {
     return null;
   }
 
-  // 4. Randomly select one unused quiz
+  // 3. Randomly select one unused quiz
   const randomIndex = Math.floor(Math.random() * unusedQuizzes.length);
   const selectedQuiz = unusedQuizzes[randomIndex];
 
-  // 5. Increment timesServed atomically
+  // 4. Increment timesServed atomically
   const updatedQuiz = await QuizBank.findByIdAndUpdate(
     selectedQuiz._id,
     { $inc: { timesServed: 1 } },

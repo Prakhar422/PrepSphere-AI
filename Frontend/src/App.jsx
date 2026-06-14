@@ -7,6 +7,8 @@ import Dashboard from "./pages/Dashboard";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
 import ResumeHistory from "./pages/ResumeHistory";
 import AptitudePractice from "./pages/AptitudePractice";
+import QuizHistory from "./pages/QuizHistory";
+import QuizReport from "./pages/QuizReport";
 import OAuthSuccess from "./pages/OAuthSuccess";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -57,6 +59,22 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <AptitudePractice />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/aptitude/history"
+            element={
+              <ProtectedRoute>
+                <QuizHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/aptitude/history/:attemptId"
+            element={
+              <ProtectedRoute>
+                <QuizReport />
               </ProtectedRoute>
             }
           />
