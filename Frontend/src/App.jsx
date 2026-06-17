@@ -9,6 +9,7 @@ import ResumeHistory from "./pages/ResumeHistory";
 import AptitudePractice from "./pages/AptitudePractice";
 import QuizHistory from "./pages/QuizHistory";
 import QuizReport from "./pages/QuizReport";
+import MockInterview from "./pages/MockInterview";
 import OAuthSuccess from "./pages/OAuthSuccess";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -78,11 +79,20 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/mock-interview"
+            element={
+              <ProtectedRoute>
+                <MockInterview />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
   );
 };
+
 
 export default App;
 
