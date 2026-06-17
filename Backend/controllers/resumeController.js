@@ -169,7 +169,18 @@ export const uploadResumeMetadata = async (req, res, next) => {
       sectionAnalysis: geminiAnalysis.sectionAnalysis,
       overallReport: geminiAnalysis.overallReport,
       analysisStatus: 'completed',
-      analysisCompletedAt: new Date()
+      analysisCompletedAt: new Date(),
+      
+      // Save recruiter-oriented profile details
+      candidateName: geminiAnalysis.candidateName,
+      professionalSummary: geminiAnalysis.professionalSummary,
+      technicalSkills: geminiAnalysis.technicalSkills,
+      projects: geminiAnalysis.projects,
+      experience: geminiAnalysis.experience,
+      education: geminiAnalysis.education,
+      certifications: geminiAnalysis.certifications,
+      achievements: geminiAnalysis.achievements,
+      relevantKeywords: geminiAnalysis.relevantKeywords
     });
 
     // 5. Save metadata + analysis record in MongoDB

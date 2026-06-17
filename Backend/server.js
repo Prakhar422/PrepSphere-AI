@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes.js';
 import resumeRoutes from './routes/resumeRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import aptitudeRoutes from './routes/aptitudeRoutes.js';
+import interviewRoutes from './routes/interviewRoutes.js';
 
 
 // Load environment variables
@@ -31,6 +32,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/aptitude', aptitudeRoutes);
+app.use('/api/interview', interviewRoutes);
 
 // Fallback Route (404 Not Found)
 app.use((req, res, next) => {

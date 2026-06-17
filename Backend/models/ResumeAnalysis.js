@@ -84,6 +84,41 @@ const resumeAnalysisSchema = new mongoose.Schema(
     analysisCompletedAt: {
       type: Date
     },
+    // Recruiter-oriented profile fields for mock interview personalization
+    candidateName: { type: String, trim: true },
+    professionalSummary: { type: String, trim: true },
+    technicalSkills: {
+      programmingLanguages: [{ type: String, trim: true }],
+      frameworks: [{ type: String, trim: true }],
+      libraries: [{ type: String, trim: true }],
+      databases: [{ type: String, trim: true }],
+      tools: [{ type: String, trim: true }]
+    },
+    projects: [
+      {
+        title: { type: String, trim: true },
+        description: { type: String, trim: true },
+        technologiesUsed: [{ type: String, trim: true }]
+      }
+    ],
+    experience: [
+      {
+        role: { type: String, trim: true },
+        company: { type: String, trim: true },
+        duration: { type: String, trim: true },
+        description: { type: String, trim: true }
+      }
+    ],
+    education: [
+      {
+        institution: { type: String, trim: true },
+        degree: { type: String, trim: true },
+        year: { type: String, trim: true }
+      }
+    ],
+    certifications: [{ type: String, trim: true }],
+    achievements: [{ type: String, trim: true }],
+    relevantKeywords: [{ type: String, trim: true }]
   },
   {
     timestamps: true,
