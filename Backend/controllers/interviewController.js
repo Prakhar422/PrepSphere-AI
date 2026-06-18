@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import InterviewSession from '../models/InterviewSession.js';
 import ResumeAnalysis from '../models/ResumeAnalysis.js';
-import { validateStartRequest } from '../utils/interviewValidation.js';
-import { generateFirstQuestion } from '../services/geminiInterviewService.js';
+import { validateStartRequest, validateAnswerRequest } from '../utils/interviewValidation.js';
+import { generateFirstQuestion, evaluateInterviewAnswer } from '../services/geminiInterviewService.js';
 import { DURATION_QUESTION_MAP } from '../config/interviewConfig.js';
 
 /**
@@ -281,7 +281,6 @@ export const startInterview = async (req, res, next) => {
         resumeRef,
         currentQuestionNumber: 1,
         currentQuestionId: firstQuestionId,
-        currentQuestionStatus: 'PENDING',
         totalQuestions,
         conversationHistory: [
           {
@@ -355,6 +354,342 @@ export const startInterview = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Internal server error occurred while initializing interview session.'
+    });
+  }
+};
+
+/**
+ * Handles submission of a candidate's answer to the current question,
+ * evaluates it via Gemini, and returns either the next question or the completed interview results.
+ * 
+ * @route POST /api/interview/:interviewId/answer
+ * @access Private
+ */
+export const submitAnswer = async (req, res, next) => {
+  const startTime = Date.now();
+  try {
+    const { interviewId } = req.params;
+
+    // 1. Validate Interview ID format
+    if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Interview ID format.'
+      });
+    }
+
+    // 2. Validate payload body
+    const validationError = validateAnswerRequest(req.body);
+    if (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError
+      });
+    }
+
+    // 3. Retrieve the interview session
+    const session = await InterviewSession.findById(interviewId);
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Interview session not found.'
+      });
+    }
+
+    // 4. Validate ownership
+    if (session.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Denied: You do not own this interview session.'
+      });
+    }
+
+    // 5. Validate status
+    if (session.status !== 'IN_PROGRESS') {
+      return res.status(400).json({
+        success: false,
+        message: 'This interview has already been completed or is not in progress.'
+      });
+    }
+
+    // 6. Find the current question
+    const currentQuestionIndex = session.conversationHistory.findIndex(
+      q => q.questionId.toString() === session.currentQuestionId.toString()
+    );
+    const currentQuestion = session.conversationHistory[currentQuestionIndex];
+
+    if (!currentQuestion) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current question could not be resolved from history.'
+      });
+    }
+
+    if (currentQuestion.status !== 'PENDING') {
+      return res.status(400).json({
+        success: false,
+        message: 'This question has already been answered or is not pending.'
+      });
+    }
+
+    const sanitizedAnswer = String(req.body.answer).trim();
+
+    // 7. Atomic Concurrency Lock: Mark the question as ANSWERED to prevent double submission
+    const answerSubmittedTime = new Date();
+    const timeTakenSeconds = Math.round(
+      (answerSubmittedTime.getTime() - new Date(currentQuestion.questionAskedTime).getTime()) / 1000
+    );
+    const resolvedTimeTaken = timeTakenSeconds > 0 ? timeTakenSeconds : 0;
+
+    const lockedSession = await InterviewSession.findOneAndUpdate(
+      {
+        _id: interviewId,
+        status: 'IN_PROGRESS',
+        currentQuestionId: session.currentQuestionId,
+        'conversationHistory.questionId': session.currentQuestionId,
+        'conversationHistory.status': 'PENDING'
+      },
+      {
+        $set: {
+          'conversationHistory.$.userAnswer': sanitizedAnswer,
+          'conversationHistory.$.answerSubmittedTime': answerSubmittedTime,
+          'conversationHistory.$.status': 'ANSWERED',
+          'conversationHistory.$.timeTaken': resolvedTimeTaken
+        }
+      },
+      { new: true }
+    );
+
+    if (!lockedSession) {
+      return res.status(400).json({
+        success: false,
+        message: 'Duplicate submission or invalid session state.'
+      });
+    }
+
+    // 8. Load Resume Context if enabled
+    let resumeContext = '';
+    if (session.resumeEnabled && session.resumeRef) {
+      try {
+        const resume = await ResumeAnalysis.findById(session.resumeRef);
+        if (resume) {
+          resumeContext = buildResumeContext(resume);
+        }
+      } catch (resumeErr) {
+        console.error('[DATABASE FAILURE] Failed to fetch resume context:', resumeErr.message);
+      }
+    }
+
+    // 9. Format dialogue history prior to current question (limit to last 3 for long interviews to reduce token size)
+    let conversationSlice = session.conversationHistory.slice(0, currentQuestionIndex);
+    if (conversationSlice.length > 3) {
+      conversationSlice = conversationSlice.slice(conversationSlice.length - 3);
+    }
+    const previousConversation = conversationSlice
+      .map(q => `Interviewer: ${q.question}\nCandidate: ${q.userAnswer}`)
+      .join('\n\n');
+
+    // 10. Call Gemini for Evaluation & Next Question
+    const geminiStart = Date.now();
+    let aiResult;
+    try {
+      aiResult = await evaluateInterviewAnswer({
+        interviewType: session.interviewType,
+        company: session.company,
+        role: session.role,
+        difficulty: session.difficulty,
+        language: session.language,
+        resumeContext,
+        currentQuestion: currentQuestion.question,
+        userAnswer: sanitizedAnswer,
+        previousConversation,
+        currentQuestionNumber: currentQuestion.questionNumber,
+        totalQuestions: session.totalQuestions
+      });
+    } catch (geminiErr) {
+      console.error('[GEMINI EVALUATION SERVICE FAILURE] Answer evaluation failed:', geminiErr.message || geminiErr);
+      
+      // Rollback atomic lock on failure so the user can re-submit
+      await InterviewSession.findOneAndUpdate(
+        {
+          _id: interviewId,
+          'conversationHistory.questionId': session.currentQuestionId
+        },
+        {
+          $set: {
+            'conversationHistory.$.status': 'PENDING',
+            'conversationHistory.$.userAnswer': '',
+            'conversationHistory.$.answerSubmittedTime': null,
+            'conversationHistory.$.timeTaken': 0
+          }
+        }
+      );
+
+      const status = geminiErr.status || 502;
+      const message = geminiErr.message || 'AI returned an invalid response.';
+      return res.status(status).json({
+        success: false,
+        message
+      });
+    }
+
+    const geminiResponseTime = Date.now() - geminiStart;
+
+    // 11. Prepare Polished Evaluation Object (including percentageScore and metadata)
+    const score = aiResult.evaluation.score;
+    const percentageScore = score * 10;
+
+    const evaluationData = {
+      score,
+      percentageScore,
+      strengths: aiResult.evaluation.strengths,
+      weaknesses: aiResult.evaluation.weaknesses,
+      suggestions: aiResult.evaluation.suggestions,
+      idealAnswer: aiResult.evaluation.idealAnswer,
+      aiMetadata: {
+        modelUsed: 'gemini-2.5-flash',
+        promptTokens: aiResult.usage?.promptTokens || 0,
+        completionTokens: aiResult.usage?.completionTokens || 0,
+        totalTokens: aiResult.usage?.totalTokens || 0,
+        responseTime: geminiResponseTime
+      }
+    };
+
+    const cleanEvaluation = {
+      score,
+      percentageScore,
+      strengths: aiResult.evaluation.strengths,
+      weaknesses: aiResult.evaluation.weaknesses,
+      suggestions: aiResult.evaluation.suggestions,
+      idealAnswer: aiResult.evaluation.idealAnswer
+    };
+
+    // 12. Complete or continue mock interview session
+    const isLastQuestion = currentQuestion.questionNumber >= session.totalQuestions;
+    let finalSession;
+
+    if (isLastQuestion) {
+      // Complete interview session
+      finalSession = await InterviewSession.findOneAndUpdate(
+        {
+          _id: interviewId,
+          'conversationHistory.questionId': session.currentQuestionId
+        },
+        {
+          $set: {
+            status: 'COMPLETED',
+            completedAt: new Date(),
+            'conversationHistory.$.evaluation': evaluationData
+          }
+        },
+        { new: true }
+      );
+
+      const executionTime = Date.now() - startTime;
+      const evaluationTime = executionTime - geminiResponseTime;
+
+      // Better Console Logs
+      console.log('================================');
+      console.log(`Interview ID: ${session._id}`);
+      console.log(`Question Number: ${currentQuestion.questionNumber}`);
+      console.log(`Score: ${score}`);
+      console.log(`Gemini Model: gemini-2.5-flash`);
+      console.log(`Prompt Tokens: ${aiResult.usage?.promptTokens || 0}`);
+      console.log(`Completion Tokens: ${aiResult.usage?.completionTokens || 0}`);
+      console.log(`Total Tokens: ${aiResult.usage?.totalTokens || 0}`);
+      console.log(`Response Time: ${geminiResponseTime}ms`);
+      console.log(`Execution Time: ${executionTime}ms`);
+      console.log('================================');
+
+      return res.status(200).json({
+        success: true,
+        evaluation: cleanEvaluation,
+        currentQuestionNumber: finalSession.totalQuestions,
+        totalQuestions: finalSession.totalQuestions,
+        remainingQuestions: 0,
+        progressPercentage: 100,
+        interviewCompleted: true
+      });
+    } else {
+      // Generate and append next question
+      const nextQuestionId = new mongoose.Types.ObjectId();
+      const nextQuestionObj = {
+        questionNumber: currentQuestion.questionNumber + 1,
+        questionId: nextQuestionId,
+        question: aiResult.nextQuestion,
+        questionAskedTime: new Date(),
+        status: 'PENDING',
+        evaluation: {
+          score: 0,
+          strengths: [],
+          weaknesses: [],
+          suggestions: [],
+          idealAnswer: ''
+        }
+      };
+
+      // First, atomically update the current question's evaluation object
+      await InterviewSession.updateOne(
+        {
+          _id: interviewId,
+          'conversationHistory.questionId': session.currentQuestionId
+        },
+        {
+          $set: {
+            'conversationHistory.$.evaluation': evaluationData
+          }
+        }
+      );
+
+      // Second, update session-level fields and append the next question in a single query
+      finalSession = await InterviewSession.findByIdAndUpdate(
+        interviewId,
+        {
+          $set: {
+            currentQuestionNumber: currentQuestion.questionNumber + 1,
+            currentQuestionId: nextQuestionId
+          },
+          $push: {
+            conversationHistory: nextQuestionObj
+          }
+        },
+        { new: true }
+      );
+
+      const executionTime = Date.now() - startTime;
+      const evaluationTime = executionTime - geminiResponseTime;
+
+      // Better Console Logs
+      console.log('================================');
+      console.log(`Interview ID: ${session._id}`);
+      console.log(`Question Number: ${currentQuestion.questionNumber}`);
+      console.log(`Score: ${score}`);
+      console.log(`Gemini Model: gemini-2.5-flash`);
+      console.log(`Prompt Tokens: ${aiResult.usage?.promptTokens || 0}`);
+      console.log(`Completion Tokens: ${aiResult.usage?.completionTokens || 0}`);
+      console.log(`Total Tokens: ${aiResult.usage?.totalTokens || 0}`);
+      console.log(`Response Time: ${geminiResponseTime}ms`);
+      console.log(`Execution Time: ${executionTime}ms`);
+      console.log('================================');
+
+      return res.status(200).json({
+        success: true,
+        evaluation: cleanEvaluation,
+        nextQuestion: aiResult.nextQuestion,
+        questionNumber: finalSession.currentQuestionNumber, // backward compatibility
+        currentQuestionNumber: finalSession.currentQuestionNumber,
+        totalQuestions: finalSession.totalQuestions,
+        remainingQuestions: finalSession.totalQuestions - (finalSession.currentQuestionNumber - 1),
+        progressPercentage: Math.round(((finalSession.currentQuestionNumber - 1) / finalSession.totalQuestions) * 100),
+        interviewCompleted: false
+      });
+    }
+
+  } catch (error) {
+    console.error('Unhandled internal error in submitAnswer controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error occurred while processing your answer.'
     });
   }
 };

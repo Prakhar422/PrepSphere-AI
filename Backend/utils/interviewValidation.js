@@ -96,3 +96,21 @@ export const validateStartRequest = (data) => {
 
   return null;
 };
+
+/**
+ * Validates the parameters for submitting an interview answer.
+ * 
+ * @param {Object} data - The request payload body
+ * @returns {string|null} Error message if invalid, null if valid
+ */
+export const validateAnswerRequest = (data) => {
+  if (!data) {
+    return 'Request body is missing.';
+  }
+  const { answer } = data;
+  if (answer === undefined || answer === null || String(answer).trim() === '') {
+    return 'Answer must not be empty.';
+  }
+  return null;
+};
+

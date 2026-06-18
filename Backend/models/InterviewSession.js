@@ -27,10 +27,18 @@ const questionSchema = new mongoose.Schema(
     },
     evaluation: {
       score: { type: Number, default: 0 },
+      percentageScore: { type: Number, default: 0 },
       strengths: [{ type: String, trim: true }],
       weaknesses: [{ type: String, trim: true }],
       suggestions: [{ type: String, trim: true }],
-      idealAnswer: { type: String, default: '' }
+      idealAnswer: { type: String, default: '' },
+      aiMetadata: {
+        modelUsed: { type: String, default: 'gemini-2.5-flash' },
+        promptTokens: { type: Number, default: 0 },
+        completionTokens: { type: Number, default: 0 },
+        totalTokens: { type: Number, default: 0 },
+        responseTime: { type: Number, default: 0 }
+      }
     },
     timeTaken: {
       type: Number, // duration in seconds
@@ -102,11 +110,6 @@ const interviewSessionSchema = new mongoose.Schema(
     },
     currentQuestionId: {
       type: mongoose.Schema.Types.ObjectId
-    },
-    currentQuestionStatus: {
-      type: String,
-      enum: ['PENDING', 'ANSWERED', 'SKIPPED'],
-      default: 'PENDING'
     },
     totalQuestions: {
       type: Number,
