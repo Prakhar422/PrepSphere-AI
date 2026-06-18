@@ -77,16 +77,7 @@ export const validateStartRequest = (data) => {
     return `Invalid speaking language. Allowed values are: ${ALLOWED_LANGUAGES.join(', ')}`;
   }
 
-  if (focusAreas !== undefined && focusAreas !== null) {
-    if (!Array.isArray(focusAreas)) {
-      return 'Focus areas must be an array.';
-    }
-    for (let i = 0; i < focusAreas.length; i++) {
-      if (typeof focusAreas[i] !== 'string') {
-        return `Focus area choice at index ${i} must be a string.`;
-      }
-    }
-  }
+
 
   if (resumeEnabled !== undefined && resumeEnabled !== null) {
     if (typeof resumeEnabled !== 'boolean') {

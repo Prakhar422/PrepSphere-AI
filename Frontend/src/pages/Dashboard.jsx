@@ -64,6 +64,14 @@ const Dashboard = () => {
   });
   const [readinessVal, setReadinessVal] = useState(0);
   const [activitiesList, setActivitiesList] = useState([]);
+  const [interviewSummary, setInterviewSummary] = useState({
+    hasInterviews: false,
+    totalInterviews: 0,
+    averageScore: 0,
+    highestScore: 0,
+    latestInterview: null,
+    loading: true
+  });
   const [qotd, setQotd] = useState({
     question: "",
     category: "",
@@ -100,6 +108,15 @@ const Dashboard = () => {
             progress: response.data.aptitudeSummary.progress || { today: 0, week: 0, month: 0 },
             loading: false,
             error: null
+          });
+
+          setInterviewSummary({
+            hasInterviews: response.data.interviewSummary.hasInterviews,
+            totalInterviews: response.data.interviewSummary.totalInterviews || 0,
+            averageScore: response.data.interviewSummary.averageScore || 0,
+            highestScore: response.data.interviewSummary.highestScore || 0,
+            latestInterview: response.data.interviewSummary.latestInterview,
+            loading: false
           });
 
           setReadinessVal(response.data.readiness || 0);
@@ -187,7 +204,8 @@ const Dashboard = () => {
     Sparkles: Sparkles,
     Calendar: Calendar,
     Award: Award,
-    Clock: Clock
+    Clock: Clock,
+    MessageSquareCode: MessageSquareCode
   };
 
   // Sidebar navigation items
@@ -682,7 +700,7 @@ const Dashboard = () => {
                 )}
               </motion.div>
 
-              {/* Card 3: Global Coding Rank */}
+              {/* Card 3: Average Interview Score */}
               <motion.div
                 variants={itemVariants}
                 className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all duration-300"
@@ -690,23 +708,32 @@ const Dashboard = () => {
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
                   <span className="text-lg font-semibold text-slate-300">
-                    Global Coding Rank
+                    Average Interview Score
                   </span>
                   <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-                    <Code2 className="w-4 h-4" />
+                    <MessageSquareCode className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="mt-4 flex items-baseline space-x-1.5">
-                  <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
-                    #1240
-                  </span>
-                </div>
-                <div className="mt-2 text-sm text-indigo-400 font-semibold flex items-center gap-1">
-                  <span>Worldwide leaderboard</span>
-                </div>
+                {interviewSummary.loading ? (
+                  <div className="space-y-3 mt-4">
+                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-4 w-40" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 flex items-baseline space-x-1.5">
+                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
+                        {interviewSummary.hasInterviews ? `${interviewSummary.averageScore}%` : "--"}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm text-slate-400 font-medium flex items-center gap-1">
+                      <span>Total: {interviewSummary.totalInterviews} session(s)</span>
+                    </div>
+                  </>
+                )}
               </motion.div>
 
-              {/* Card 4: Daily Streak */}
+              {/* Card 4: Highest Interview Score */}
               <motion.div
                 variants={itemVariants}
                 className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all duration-300"
@@ -714,20 +741,29 @@ const Dashboard = () => {
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
                   <span className="text-lg font-semibold text-slate-300">
-                    Daily Streak
+                    Highest Interview Score
                   </span>
                   <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
-                    <Flame className="w-4 h-4 animate-pulse" />
+                    <Award className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="mt-4 flex items-baseline space-x-1.5">
-                  <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                    12 Days
-                  </span>
-                </div>
-                <div className="mt-2 text-sm text-slate-400 font-medium flex items-center gap-1">
-                  <span>Record: 24 days max</span>
-                </div>
+                {interviewSummary.loading ? (
+                  <div className="space-y-3 mt-4">
+                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-4 w-40" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 flex items-baseline space-x-1.5">
+                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                        {interviewSummary.hasInterviews ? `${interviewSummary.highestScore}%` : "--"}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm text-slate-400 font-medium flex items-center gap-1">
+                      <span>Best performance metric</span>
+                    </div>
+                  </>
+                )}
               </motion.div>
             </motion.section>
 
@@ -967,21 +1003,31 @@ const Dashboard = () => {
 
                     <div>
                       <div className="flex justify-between text-slate-400 text-sm mb-1">
-                        <span>DSA &amp; Logic</span>
-                        <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Coming Soon</span>
+                        <span>Mock Interview</span>
+                        <span className="font-bold text-slate-300">
+                          {interviewSummary.loading ? "..." : (interviewSummary.hasInterviews ? `${interviewSummary.averageScore}%` : "0%")}
+                        </span>
                       </div>
-                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden opacity-40">
-                        <div className="h-full bg-slate-700" style={{ width: "0%" }} />
+                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-indigo-500 transition-all duration-500" 
+                          style={{ width: `${interviewSummary.loading ? 0 : (interviewSummary.hasInterviews ? interviewSummary.averageScore : 0)}%` }}
+                        />
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between text-slate-400 text-sm mb-1">
                         <span>Communication</span>
-                        <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Coming Soon</span>
+                        <span className="font-bold text-slate-300">
+                          {interviewSummary.loading ? "..." : (interviewSummary.hasInterviews ? `${interviewSummary.latestInterview?.communicationScore || 0}%` : "0%")}
+                        </span>
                       </div>
-                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden opacity-40">
-                        <div className="h-full bg-slate-700" style={{ width: "0%" }} />
+                      <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-cyan-500 transition-all duration-500" 
+                          style={{ width: `${interviewSummary.loading ? 0 : (interviewSummary.hasInterviews ? (interviewSummary.latestInterview?.communicationScore || 0) : 0)}%` }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1260,53 +1306,81 @@ const Dashboard = () => {
                       AI Interview Coach
                     </h3>
                     <span className="text-xs text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md font-bold">
-                      Ready
+                      {interviewSummary.loading ? "..." : (interviewSummary.hasInterviews ? "Sync Active" : "Ready")}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[
-                      "HR Focus",
-                      "Technical",
-                      "System Design",
-                      "Behavioral",
-                    ].map((type, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 bg-slate-950/30 border border-white/5 rounded-xl text-center group hover:border-indigo-500/20 transition-all duration-200 hover:scale-[1.01]"
-                      >
-                        <span className="block text-sm font-semibold text-slate-300 group-hover:text-white">
-                          {type}
-                        </span>
-                        <span className="block text-sm text-slate-400 mt-1">
-                          AI Guided
-                        </span>
+                  {interviewSummary.loading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-14 w-full" />
+                    </div>
+                  ) : !interviewSummary.hasInterviews ? (
+                    <>
+                      {/* Empty state: No Interview Yet */}
+                      <div className="text-center py-4 space-y-2.5">
+                        <div className="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mx-auto animate-pulse">
+                          <MessageSquareCode className="w-6 h-6" />
+                        </div>
+                        <h4 className="text-sm font-bold text-white">No Mock Session Attempted Yet</h4>
+                        <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                          Assess your real-world technical and soft skills under strict recruiter personas before placements begin.
+                        </p>
                       </div>
-                    ))}
-                  </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Dashboard stats layout */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="p-3 bg-slate-950/30 border border-white/5 rounded-xl text-center">
+                          <span className="block text-xs text-slate-400 uppercase tracking-wider">Total</span>
+                          <span className="block text-base font-extrabold text-white mt-1">
+                            {interviewSummary.totalInterviews}
+                          </span>
+                        </div>
+                        <div className="p-3 bg-slate-950/30 border border-white/5 rounded-xl text-center">
+                          <span className="block text-xs text-slate-400 uppercase tracking-wider">Avg Score</span>
+                          <span className="block text-base font-extrabold text-indigo-400 mt-1">
+                            {interviewSummary.averageScore}%
+                          </span>
+                        </div>
+                        <div className="p-3 bg-slate-950/30 border border-white/5 rounded-xl text-center">
+                          <span className="block text-xs text-slate-400 uppercase tracking-wider">Best Score</span>
+                          <span className="block text-base font-extrabold text-emerald-400 mt-1">
+                            {interviewSummary.highestScore}%
+                          </span>
+                        </div>
+                      </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.01] border border-white/5">
-                    <div>
-                      <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
-                        Recommended Session
-                      </span>
-                      <span className="text-sm text-white font-semibold">
-                        Technical Interview: System Design Concepts
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">
-                        Success Score
-                      </span>
-                      <span className="text-sm text-emerald-400 font-bold">
-                        95% score target
-                      </span>
-                    </div>
-                  </div>
+                      <div className="p-3.5 rounded-xl bg-white/[0.01] border border-white/5">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                              Recent Interview
+                            </span>
+                            <span className="text-xs text-white font-semibold">
+                              {interviewSummary.latestInterview?.category} Mock ({interviewSummary.latestInterview?.company})
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                              Score
+                            </span>
+                            <span className="text-xs text-emerald-400 font-extrabold">
+                              {interviewSummary.latestInterview?.score}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="pt-6 border-t border-white/5 mt-4">
-                  <button className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-sm font-medium transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] cursor-pointer">
+                  <button 
+                    onClick={() => navigate("/mock-interview")}
+                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-sm font-medium transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                  >
                     <Play className="w-3.5 h-3.5" />
                     Start Mock Interview
                   </button>

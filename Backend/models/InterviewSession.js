@@ -53,6 +53,77 @@ const questionSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const interviewReportSchema = new mongoose.Schema(
+  {
+    overallScore: {
+      type: Number,
+      required: true
+    },
+    communicationScore: {
+      type: Number,
+      required: true
+    },
+    technicalScore: {
+      type: Number,
+      required: true
+    },
+    problemSolvingScore: {
+      type: Number,
+      required: true
+    },
+    confidenceScore: {
+      type: Number,
+      required: true
+    },
+    readinessLevel: {
+      type: String,
+      enum: ['Needs Improvement', 'Developing', 'Interview Ready', 'Placement Ready', 'Excellent Candidate'],
+      required: true
+    },
+    overallFeedback: {
+      type: String,
+      required: true
+    },
+    strengths: [{
+      type: String,
+      trim: true
+    }],
+    weaknesses: [{
+      type: String,
+      trim: true
+    }],
+    recommendations: [{
+      type: String,
+      trim: true
+    }],
+    interviewSummary: {
+      type: String,
+      required: true
+    },
+    careerAdvice: {
+      type: String,
+      default: ''
+    },
+    totalQuestions: {
+      type: Number,
+      required: true
+    },
+    answeredQuestions: {
+      type: Number,
+      required: true
+    },
+    averageScore: {
+      type: Number,
+      required: true
+    },
+    completedAt: {
+      type: Date,
+      default: Date.now
+    }
+  },
+  { _id: false }
+);
+
 const interviewSessionSchema = new mongoose.Schema(
   {
     user: {
@@ -127,6 +198,10 @@ const interviewSessionSchema = new mongoose.Schema(
     },
     completedAt: {
       type: Date
+    },
+    report: {
+      type: interviewReportSchema,
+      default: null
     }
   },
   {

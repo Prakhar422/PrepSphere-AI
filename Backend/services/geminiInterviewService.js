@@ -53,7 +53,6 @@ export const generateFirstQuestion = async ({
   role,
   difficulty,
   language,
-  focusAreas,
   resumeContext
 }) => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -80,18 +79,14 @@ Priority Order for Contextualization:
 2. Target Job Role: ${role}
 3. Target Company: ${company}
 4. Difficulty: ${difficulty}
-5. Focus Areas / Concepts: ${focusAreas && focusAreas.length > 0 ? focusAreas.join(', ') : 'Role Core Concepts'}
-6. Spoken Language: ${language}
+5. Spoken Language: ${language}
 
-Strict Behavioral Directives:
-${resumeContext ? `[Resume Context Available]
-- Focus heavily on the candidate's actual projects, internships, experience, technologies used, architecture decisions, and problem-solving scenarios mentioned in the resume context.
-- Formulate a natural, specific, recruiter-style first question that queries one of their projects or work experience (e.g. "I noticed you built [Project] using [Tech]. Can you explain its backend architecture?" or "In your role as [Role] at [Company], how did you handle [Task]?").
-- Prefer project-based and experience-based questions over generic interview questions.
-- AVOID generic opening prompts such as "Tell me about yourself" or "Walk me through your resume".
-- Never output things like "According to your resume" or "Your ATS score is...". Speak as if you are directly starting the interview conversation.` : `[No Resume Context Available]
-- Formulate a strong, role-specific first question tailored for a ${role} interview at ${company}.
-- You may start with a brief, professional opening matching the role/company tone (e.g. "Welcome! Let's start with your background and what motivated you to apply for the ${role} role...").`}
+Intelligent Coverage Rules:
+- If Resume Mode is enabled (Resume Context is provided below), you MUST start the interview with a highly specific, recruiter-style question focused on the candidate's actual projects, internships, technologies, experience, or architectural decisions (e.g. "I noticed you built [Project] using [Tech]. Why did you choose that database architecture?" or "In your role as [Role] at [Company], how did you implement [Task]?"). Prefer project-specific questions over generic technical starters.
+- If Resume Mode is disabled, start with a strong, role-specific technical question related to ${role} (e.g. for MERN stack: React/Node/Express/Mongo; for Frontend: React/JS/HTML/CSS; for Backend: Node/Databases/API/Security, etc.).
+- Never start the interview with generic questions such as "Walk me through your resume" or "Tell me about yourself".
+- Make sure the question matches the selected difficulty level (${difficulty}).
+- Speak directly to the candidate as the interviewer. Never mention administrative parameters like "ATS score" or "According to your resume context".
 
 - Creative & Unique: Never ask the same generic template question repeatedly. Vary your choice of topic, technology, or scenario.
 - Single Question: Return exactly one question.
@@ -190,58 +185,67 @@ export const evaluateInterviewAnswer = async ({
     }
   });
 
-  const prompt = `You are a professional, senior corporate interviewer conducting a mock placement interview.
-Your role is to simulate a realistic, high-quality interview experience. Behave like an experienced corporate interviewer.
+  const historyText = previousConversation && previousConversation.length > 0
+    ? previousConversation
+    : 'No previous conversation history.';
+
+  const isLastQuestion = Number(currentQuestionNumber) >= Number(totalQuestions);
+
+  const prompt = `You are a professional, senior corporate interviewer and recruiter conducting a mock placement interview.
+Your role is to evaluate the candidate's last answer, rate it, and generate the next question to progress the interview.
 
 Candidate/Interview Context:
-- Interview Type: ${interviewType}
-- Target Company: ${company}
 - Target Job Role: ${role}
-- Difficulty Level: ${difficulty}
-- Language: ${language} (Evaluate the answer and generate the next question in this language. If Mixed, use a professional blend of English and Hindi. If Hindi, use Hindi. If English, use English.)
+- Target Company: ${company}
+- Interview Type: ${interviewType}
+- Difficulty: ${difficulty}
+- Language: ${language}
 ${resumeContext ? `- Candidate Resume Context:\n${resumeContext}\n` : ''}
 
-Interview Progress:
+Current Progress:
 - Current Question Number: ${currentQuestionNumber} of ${totalQuestions}
-- Total Questions: ${totalQuestions}
+- Is Last Question: ${isLastQuestion ? 'Yes (No next question should be generated)' : 'No (Generate the next question based on coverage rules)'}
 
-Conversation History so far:
-${previousConversation || 'No previous conversation (this is the first question evaluation).'}
+Previous Conversation History:
+${historyText}
 
-Current Question Asked:
-"${currentQuestion}"
+Last Question Asked: ${currentQuestion}
+Candidate's Answer: ${userAnswer}
 
-Candidate's Answer:
-"${userAnswer}"
+Intelligent Interview Coverage Rules:
+Based on the Interview Type (${interviewType}), you must cover the appropriate topics dynamically.
+1. "Technical" Type: Focus strictly on technical capabilities:
+   - Candidate's Resume/Projects/Architecture (highest priority if resume is enabled).
+   - Role-specific technical questions (e.g. key frameworks, languages, APIs, system design, databases appropriate for a ${role} position).
+   - Core CS concepts (DSA, Object-Oriented Programming, Operating Systems, DBMS, and Networks).
+2. "HR" Type: Focus strictly on behavioral and career/culture fit:
+   - Behavioral questions (STAR method scenarios: teamwork, conflict resolution, leadership, problem solving).
+   - HR fit questions (career goals, strengths/weaknesses, why they want to work at ${company}).
+3. "Mixed" Type: A balanced blend of Technical, Core CS, Behavioral, and HR questions.
+4. "System Design" Type: Focus on system architecture, database choices, scalability, APIs, performance, microservices, caching, and infrastructure.
 
-Strict Interviewer Guidelines:
-1. Behave like an experienced recruiter: Make the interview feel dynamic, interactive, and conversational.
-2. Follow-up and Adapt: Use the candidate's previous answer to guide your next question. Ask natural, context-aware follow-up questions rather than jumping randomly between topics.
-3. Adapt Difficulty: 
-   - If the candidate performed well on the current question, progress to a more advanced concept to test their limits.
-   - If the candidate performed poorly (e.g., low score, struggled with details), ask another question on the same concept/topic from a different angle or with more guidance to see if they can recover.
-4. Avoid Redundancy: Never repeat previous questions or ask highly similar questions already discussed in the Conversation History.
-5. Prevent Generic Questions: Avoid generic "textbook" questions. Make questions specific to the role, company, and projects if resume context is available.
-6. Progression: Keep the conversation moving forward; never restart the conversation or say things like "Let's start the interview...".
-7. Final Question Rule: If this is the final question (Current Question Number ${currentQuestionNumber} matches Total Questions ${totalQuestions}), set the 'nextQuestion' field to an empty string (""). Do not generate another question.
+Adaptive Difficulty & Flow Guidelines:
+- Do NOT repeat questions that have already been asked or look too similar.
+- Progressively increase difficulty and dive deeper if the candidate answers correctly and exhibits strong knowledge.
+- If the candidate struggles, reduce difficulty slightly or test from a different angle before moving on.
+- As the interview progresses, transition naturally between topics (e.g. starting with Resume projects -> moving to Role technicals -> Core CS -> and concluding with Behavioral/HR as appropriate for the type).
+- Always match the overall tone of a senior corporate recruiter at ${company}. Keep questions realistic and challenging but professional.
+- Speak directly to the candidate in the next question. Do not refer to parameters or state "based on your resume..." in the question itself.
 
-You must return a JSON object conforming exactly to the schema:
-{
-  "evaluation": {
-    "score": number,
-    "strengths": ["string", ...],
-    "weaknesses": ["string", ...],
-    "suggestions": ["string", ...],
-    "idealAnswer": "string"
-  },
-  "nextQuestion": "string"
-}
+Evaluation Rules:
+1. Score: Rate the candidate's response to the last question on a scale from 1 (poor) to 10 (perfect).
+2. Strengths: Identify 1-3 specific positive aspects of their answer.
+3. Weaknesses: Identify 1-3 specific gaps or errors in their answer.
+4. Suggestions: Provide clear, actionable advice on how they can improve their response.
+5. Ideal Answer: Write a comprehensive, high-quality reference answer for the last question that demonstrates the standard expected at ${company} for a ${role} position.
 
-Strictly follow these rules:
-- Return ONLY the JSON object conforming to the schema. No markdown wrapping, no code blocks, no additional explanation text.
-- Do NOT include markdown styling inside the JSON keys or values.
-- Ensure the JSON is completely valid.
-- The evaluation must be fair, constructive, and highly professional.`;
+Next Question Generation:
+- If Is Last Question is "Yes", the 'nextQuestion' field MUST be an empty string ("").
+- If Is Last Question is "No", you MUST generate the next single interview question in the 'nextQuestion' field. Keep it concise, professional, and in the language: ${language}.
+  - If language is Mixed, use a professional blend of English and Hindi (Hinglish). If language is Hindi, use Hindi. If English, use English.
+
+Response Format:
+You must return a JSON object conforming exactly to the response schema requested. Do not wrap in markdown or provide extra text.`;
 
   const runApiCall = async () => {
     return await retryWithBackoff(async (attempt) => {
@@ -325,4 +329,115 @@ Strictly follow these rules:
       console.warn(`[GEMINI INTERVIEW EVALUATION] Malformed response, retrying JSON validation once...`);
     }
   }
+};
+
+/**
+ * Generates a final interview report containing feedback summary, strengths, weaknesses,
+ * placement readiness, and personalized career recommendations.
+ * 
+ * @param {Object} params - Dialogue data and user details
+ * @returns {Promise<Object>} The compiled final report components from Gemini
+ */
+export const generateInterviewReport = async ({
+  interviewType,
+  company,
+  role,
+  difficulty,
+  resumeContext,
+  conversationHistory,
+  overallScore
+}) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not defined in the environment variables');
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          overallFeedback: { type: 'string' },
+          strengths: { type: 'array', items: { type: 'string' } },
+          weaknesses: { type: 'array', items: { type: 'string' } },
+          recommendations: { type: 'array', items: { type: 'string' } },
+          placementReadiness: { type: 'string' },
+          careerAdvice: { type: 'string' }
+        },
+        required: ['overallFeedback', 'strengths', 'weaknesses', 'recommendations', 'placementReadiness', 'careerAdvice']
+      },
+      temperature: 0.7,
+      maxOutputTokens: 2048
+    }
+  });
+
+  // Format the full interview history for analysis
+  const historyText = conversationHistory
+    .map((q, idx) => {
+      const evalText = q.evaluation
+        ? `Score: ${q.evaluation.score}/10\nStrengths: ${q.evaluation.strengths.join(', ')}\nWeaknesses: ${q.evaluation.weaknesses.join(', ')}\nSuggestions: ${q.evaluation.suggestions.join(', ')}`
+        : 'No evaluation details.';
+      return `Question ${idx + 1}: ${q.question}\nCandidate Answer: ${q.userAnswer}\nEvaluation: ${evalText}`;
+    })
+    .join('\n\n');
+
+  const prompt = `You are an expert corporate technical recruiter and placement officer.
+Analyze the following mock placement interview dialogue, candidate responses, and individual question evaluations to write a cohesive final placement report.
+
+Candidate/Interview Context:
+- Target Job Role: ${role}
+- Target Company: ${company}
+- Interview Type: ${interviewType}
+- Difficulty Level: ${difficulty}
+- Combined Performance Score: ${overallScore}%
+${resumeContext ? `- Candidate Resume Profile:\n${resumeContext}\n` : ''}
+
+Full Dialogue History & Evaluations:
+${historyText}
+
+Strict Analysis Guidelines:
+1. Synthesize all observations into a comprehensive, highly constructive "overallFeedback" summary block (150-250 words) evaluating speech precision, tech knowledge, and structure.
+2. Formulate 2-4 primary recruiter-verified "strengths" demonstrated across the conversation.
+3. Formulate 2-3 specific focus areas for improvement ("weaknesses").
+4. List 3-4 specific preparation "recommendations" (next steps to take).
+5. Map their "placementReadiness" classification. Choose exactly one from:
+   - "Needs Improvement" (score < 50)
+   - "Developing" (score 50-69)
+   - "Interview Ready" (score 70-79)
+   - "Placement Ready" (score 80-89)
+   - "Excellent Candidate" (score >= 90)
+6. Deliver tailored "careerAdvice" (100-150 words) targeting the role of ${role} at ${company}.
+
+You must return a JSON object conforming exactly to the schema:
+{
+  "overallFeedback": "string",
+  "strengths": ["string", ...],
+  "weaknesses": ["string", ...],
+  "recommendations": ["string", ...],
+  "placementReadiness": "string",
+  "careerAdvice": "string"
+}
+
+Strictly follow these rules:
+- Return ONLY the JSON object. No explanation, no markdown wraps.`;
+
+  console.log(`[GEMINI REPORT] Requesting final placement summary for Session. Overall Score: ${overallScore}%`);
+
+  const result = await retryWithBackoff(async (attempt) => {
+    return await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }]
+        }
+      ]
+    });
+  });
+
+  const rawText = result.response.text();
+  const cleaned = cleanJsonResponseText(rawText);
+  return JSON.parse(cleaned);
 };

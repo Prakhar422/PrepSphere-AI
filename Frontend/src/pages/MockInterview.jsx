@@ -2,6 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
+import {
+  startInterview as apiStartInterview,
+  submitAnswer as apiSubmitAnswer,
+  getInterviewHistory as apiGetInterviewHistory,
+  getInterviewReport as apiGetInterviewReport
+} from "../services/interviewService";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ResponsiveContainer,
@@ -78,12 +84,6 @@ const ROLES_LIST = [
   "Python Developer", "Data Analyst", "Data Scientist", "AI Engineer",
   "Machine Learning Engineer", "Cloud Engineer", "DevOps Engineer", "Security Engineer",
   "QA Engineer", "Product Engineer", "Other"
-];
-
-const FOCUS_AREAS_LIST = [
-  "React", "Node.js", "MongoDB", "JavaScript", "TypeScript", "HTML", "CSS", "Tailwind",
-  "DBMS", "Operating Systems", "Computer Networks", "OOP", "SQL", "DSA", "System Design",
-  "Behavioral Questions", "HR Questions", "Problem Solving", "Leadership", "Communication"
 ];
 
 const INTERVIEW_TYPES = [
@@ -278,12 +278,18 @@ const MockInterview = () => {
   const [currentView, setCurrentView] = useState("home");
 
   // Main lists states
-  const [historyList, setHistoryList] = useState(initialHistoryRecords);
+  const [historyList, setHistoryList] = useState([]);
   const [activeReport, setActiveReport] = useState(null);
 
   // Loading, Empty, and Error States variables
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
+
+  // Pagination and Report loading states
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
 
   // Setup/Configuration State
   const [config, setConfig] = useState({
@@ -296,8 +302,7 @@ const MockInterview = () => {
     duration: 30,
     useResume: true,
     questionCount: 15,
-    language: "English",
-    focusAreas: ["React", "Node.js", "DSA"]
+    language: "English"
   });
 
   const [companySearch, setCompanySearch] = useState("");
@@ -324,6 +329,30 @@ const MockInterview = () => {
     fetchResume();
   }, []);
 
+  const fetchHistory = async (page = 1) => {
+    setHistoryLoading(true);
+    try {
+      const data = await apiGetInterviewHistory(page, 10);
+      if (data && data.success) {
+        setHistoryList(data.history || []);
+        setHistoryPage(data.pagination?.page || 1);
+        setHistoryTotalPages(data.pagination?.pages || 1);
+      }
+    } catch (err) {
+      console.error("Error fetching history:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentView === "history") {
+      fetchHistory(historyPage);
+    } else if (currentView === "home") {
+      fetchHistory(1);
+    }
+  }, [currentView, historyPage]);
+
 
   // Active Chat State
   const [chatMessages, setChatMessages] = useState([]);
@@ -333,6 +362,20 @@ const MockInterview = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+
+  // Live Interview States
+  const [activeInterview, setActiveInterview] = useState(null);
+  const [progress, setProgress] = useState({
+    currentQuestionNumber: 1,
+    totalQuestions: 15,
+    remainingQuestions: 15,
+    progressPercentage: 0
+  });
+  const [interviewCompleted, setInterviewCompleted] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
+  const [pendingAnswer, setPendingAnswer] = useState("");
+  const [apiError, setApiError] = useState("");
+  const [evaluations, setEvaluations] = useState([]);
 
   // Live indicators states
   const [liveMetrics, setLiveMetrics] = useState({
@@ -406,177 +449,274 @@ const MockInterview = () => {
   };
 
   // 2. Actions from Setup
-  const handleLaunchInterview = () => {
+  const handleLaunchInterview = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setElapsedTime(0);
-      setActiveQuestionIdx(0);
-      setLiveMetrics({
-        confidence: 75,
-        communication: 78,
-        technicalAccuracy: 65,
-        responseTime: 80,
-        professionalism: 85,
-        eyeContact: 90
-      });
-      setLiveSuggestions([
-        { type: "strength", text: "Neutral speech rate verified." },
-        { type: "suggestion", text: "Speak clearly and state key conceptual frameworks first." }
-      ]);
-      
+    setApiError("");
+    setLoadingMessage("Starting your AI mock interview session...");
+    
+    try {
       const selectedCompany = config.company === "Other" ? config.customCompany : config.company;
       const selectedRole = config.jobRole === "Other" ? config.customRole : config.jobRole;
+      const payload = {
+        interviewType: config.category,
+        company: selectedCompany,
+        role: selectedRole,
+        difficulty: config.difficulty,
+        duration: config.duration,
+        language: config.language,
+        resumeEnabled: !!config.useResume,
+        resumeId: config.useResume && latestResume ? latestResume._id : null
+      };
+
+      const data = await apiStartInterview(payload);
       
-      // First AI Message
-      const presetsKey = config.category === "System Design" ? "System Design" : config.category;
-      const firstQuestion = (AI_QUESTION_PRESETS[presetsKey] && AI_QUESTION_PRESETS[presetsKey][0]) 
-        || "Welcome! Let's start with describing your background and main credentials.";
+      if (data && data.success) {
+        setElapsedTime(0);
+        setActiveQuestionIdx(0);
+        setLiveMetrics({
+          confidence: 75,
+          communication: 78,
+          technicalAccuracy: 65,
+          responseTime: 80,
+          professionalism: 85,
+          eyeContact: 90
+        });
+        setLiveSuggestions([
+          { type: "suggestion", text: "Speak clearly and state key conceptual frameworks first." }
+        ]);
+
+        setActiveInterview({
+          _id: data.interviewId,
+          ...data.interviewConfiguration
+        });
+
+        // Set config questionCount to match totalQuestions from backend
+        setConfig(prev => ({
+          ...prev,
+          questionCount: data.totalQuestions
+        }));
+
+        setProgress({
+          currentQuestionNumber: 1,
+          totalQuestions: data.totalQuestions,
+          remainingQuestions: data.totalQuestions,
+          progressPercentage: 0
+        });
+
+        setEvaluations([]);
+        setInterviewCompleted(false);
+
+        // First AI Message
+        setChatMessages([
+          {
+            sender: "ai",
+            text: `Welcome, ${user?.name || "Candidate"}. I'll be conducting your ${config.category} mock interview today for the ${selectedRole} role at ${selectedCompany}. Let's begin. ${data.firstQuestion}`,
+            timestamp: new Date()
+          }
+        ]);
         
-      setChatMessages([
-        {
-          sender: "ai",
-          text: `Welcome, ${user?.name || "Candidate"}. I'll be conducting your ${config.category} mock interview today for the ${selectedRole} role at ${selectedCompany}. Let's begin. ${firstQuestion}`,
-          timestamp: new Date()
-        }
-      ]);
-      setCurrentView("chat");
-    }, 600);
+        setCurrentView("chat");
+      } else {
+        setApiError("Failed to initialize session. Please check your network and try again.");
+        setIsError(true);
+      }
+    } catch (err) {
+      console.error("Error launching interview:", err);
+      setApiError(err.response?.data?.message || "Failed to launch interview. Please try again.");
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
+    }
   };
 
   // 3. User Response submission during live interview chat
   const handleSendResponse = () => {
-    if (!chatInput.trim() || isTyping) return;
+    if (!chatInput.trim() || isTyping || isPaused) return;
     
     const userText = chatInput;
+    setPendingAnswer(userText);
     setChatInput("");
+    setApiError("");
 
     // Add user message
-    const updatedMessages = [
-      ...chatMessages,
+    setChatMessages((prev) => [
+      ...prev,
       { sender: "user", text: userText, timestamp: new Date() }
-    ];
-    setChatMessages(updatedMessages);
-    setIsTyping(true);
-
-    // Dynamic metrics shifts to simulate AI tracking
-    const confidenceChange = Math.floor(Math.random() * 11) - 5; // -5 to +5
-    const accuracyChange = Math.floor(Math.random() * 16) - 5; // -5 to +10
-    const communicationChange = Math.floor(Math.random() * 11) - 3; // -3 to +7
+    ]);
     
-    setTimeout(() => {
-      setLiveMetrics((prev) => ({
-        ...prev,
-        confidence: Math.max(50, Math.min(100, prev.confidence + confidenceChange)),
-        technicalAccuracy: Math.max(50, Math.min(100, prev.technicalAccuracy + accuracyChange)),
-        communication: Math.max(50, Math.min(100, prev.communication + communicationChange))
-      }));
+    executeAnswerSubmission(userText);
+  };
 
-      // Set live suggestion feedback based on accuracy changes
-      if (accuracyChange > 0) {
-        setLiveSuggestions([
-          { type: "strength", text: "Strong use of domain-specific terminology." },
-          { type: "suggestion", text: "Explain how you would validate parameters to make it flawless." }
-        ]);
-      } else {
-        setLiveSuggestions([
-          { type: "weakness", text: "Could explain structural code constraints in more depth." },
-          { type: "suggestion", text: "Include error handling patterns in your response." }
-        ]);
+  const executeAnswerSubmission = async (answerText) => {
+    setIsTyping(true);
+    setApiError("");
+    setLoadingMessage("AI is evaluating your answer...");
+
+    try {
+      const interviewId = activeInterview?._id;
+      if (!interviewId) {
+        throw new Error("Active interview session not found.");
       }
 
-      // Next Question index
-      const nextIdx = activeQuestionIdx + 1;
-      const totalQuestions = config.questionCount;
+      const res = await apiSubmitAnswer(interviewId, { answer: answerText });
 
-      if (nextIdx >= totalQuestions) {
-        // Interview is complete!
-        setIsTyping(false);
-        handleEndInterview();
-      } else {
-        // AI asks next preset question
-        const nextQuestion = AI_QUESTION_PRESETS[config.category][nextIdx] || "That was interesting. Can you expand on how you'd deploy and maintain this in production?";
-        setChatMessages((prev) => [
+      if (res && res.success) {
+        setLoadingMessage("Preparing your next interview question...");
+        
+        // Minor delay for natural conversation flow
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+
+        // Format evaluation details (formatted feedback block)
+        const feedbackText = `📊 Evaluation for your answer:
+• Score: ${res.evaluation.percentageScore || (res.evaluation.score * 10)}%
+• Strengths: ${res.evaluation.strengths.join(", ")}
+• Areas to Improve: ${res.evaluation.weaknesses.join(", ")}
+• Suggestions: ${res.evaluation.suggestions.join(", ")}`;
+
+        // Extract the exact question text that was answered
+        const aiMessages = chatMessages.filter(msg => msg.sender === "ai");
+        const rawLastQuestion = aiMessages[aiMessages.length - 1]?.text || "";
+        const cleanLastQuestion = rawLastQuestion.includes("Let's begin. ")
+          ? rawLastQuestion.split("Let's begin. ")[1]
+          : rawLastQuestion;
+
+        // Save evaluation block in history log
+        const newEvalObj = {
+          question: cleanLastQuestion,
+          answer: answerText,
+          ideal: res.evaluation.idealAnswer || "No ideal answer details returned.",
+          score: res.evaluation.percentageScore || (res.evaluation.score * 10),
+          feedback: res.evaluation.suggestions.join(" ") || "No feedback suggestions.",
+          strengths: res.evaluation.strengths || [],
+          weaknesses: res.evaluation.weaknesses || []
+        };
+
+        const updatedEvals = [...evaluations, newEvalObj];
+        setEvaluations(updatedEvals);
+
+        // Update live meters dynamically based on scores
+        setLiveMetrics((prev) => ({
           ...prev,
-          { sender: "ai", text: nextQuestion, timestamp: new Date() }
-        ]);
-        setActiveQuestionIdx(nextIdx);
-        setIsTyping(false);
+          technicalAccuracy: res.evaluation.percentageScore || (res.evaluation.score * 10),
+          confidence: Math.round(Math.max(50, Math.min(100, 60 + (res.evaluation.score * 3.5) + Math.random() * 8))),
+          communication: Math.round(Math.max(50, Math.min(100, 55 + (res.evaluation.score * 4.5) + Math.random() * 6))),
+          professionalism: Math.round(Math.max(50, Math.min(100, 65 + (res.evaluation.score * 3) + Math.random() * 5))),
+        }));
+
+        // Render coach dynamic pointers
+        const coachTips = [];
+        if (res.evaluation.strengths?.length > 0) {
+          coachTips.push({ type: "strength", text: res.evaluation.strengths[0] });
+        }
+        if (res.evaluation.weaknesses?.length > 0) {
+          coachTips.push({ type: "weakness", text: res.evaluation.weaknesses[0] });
+        }
+        if (res.evaluation.suggestions?.length > 0) {
+          coachTips.push({ type: "suggestion", text: res.evaluation.suggestions[0] });
+        }
+        setLiveSuggestions(coachTips);
+
+        // Update progress metadata
+        setProgress({
+          currentQuestionNumber: res.currentQuestionNumber,
+          totalQuestions: res.totalQuestions,
+          remainingQuestions: res.remainingQuestions,
+          progressPercentage: res.progressPercentage
+        });
+
+        if (res.interviewCompleted) {
+          setChatMessages((prev) => [
+            ...prev,
+            { sender: "ai", text: feedbackText, timestamp: new Date() }
+          ]);
+          setIsTyping(false);
+          handleEndInterview(updatedEvals);
+        } else {
+          setChatMessages((prev) => [
+            ...prev,
+            { sender: "ai", text: feedbackText, timestamp: new Date() },
+            { sender: "ai", text: res.nextQuestion, timestamp: new Date() }
+          ]);
+          setActiveQuestionIdx(res.currentQuestionNumber - 1);
+          setIsTyping(false);
+        }
+      } else {
+        throw new Error("Failed response returned from API controller.");
       }
-    }, 1500); // 1.5 second simulated delay
+    } catch (err) {
+      console.error("Error submitting answer:", err);
+      const errMsg = err.response?.data?.message || err.message || "Network error submitting response. Please try again.";
+      setApiError(errMsg);
+      
+      // Rollback last user response bubble from chat logs and load text back for edits
+      setChatMessages((prev) => prev.slice(0, prev.length - 1));
+      setChatInput(answerText);
+      setIsTyping(false);
+    } finally {
+      setLoadingMessage("");
+    }
+  };
+
+  const handleRetry = () => {
+    if (!pendingAnswer || isTyping) return;
+
+    setChatMessages((prev) => [
+      ...prev,
+      { sender: "user", text: pendingAnswer, timestamp: new Date() }
+    ]);
+
+    executeAnswerSubmission(pendingAnswer);
   };
 
   // 4. Force termination or normal completion
-  const handleEndInterview = () => {
+  const handleEndInterview = async (finalEvals) => {
     setIsLoading(true);
     clearInterval(timerRef.current);
     
-    // Simulate generation of report card
-    setTimeout(() => {
-      // Calculate overall average
-      const scoreTotal = (liveMetrics.confidence + liveMetrics.communication + liveMetrics.technicalAccuracy + liveMetrics.professionalism) / 4;
-      const finalScore = Math.round(scoreTotal);
-      
-      const newReport = {
-        id: `int-${Date.now().toString().slice(-4)}`,
-        category: config.category,
-        company: config.company,
-        role: config.jobRole,
-        difficulty: config.difficulty,
-        score: finalScore,
-        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-        duration: `${Math.floor(elapsedTime / 60) || 1} Min`,
-        status: finalScore >= 80 ? "Completed" : "Needs Practice",
-        metrics: { ...liveMetrics },
-        radarData: [
-          { subject: "Confidence", value: liveMetrics.confidence },
-          { subject: "Communication", value: liveMetrics.communication },
-          { subject: "Technical Accuracy", value: liveMetrics.technicalAccuracy },
-          { subject: "Response Time", value: liveMetrics.responseTime },
-          { subject: "Professionalism", value: liveMetrics.professionalism },
-          { subject: "Eye Contact", value: liveMetrics.eyeContact }
-        ],
-        strengths: [
-          "Outstanding vocal presence and responsive pacing.",
-          "Demonstrated solid logical understanding of MERN paradigms.",
-          "Clean structures applied to solve real-world problems."
-        ],
-        weaknesses: [
-          "Could be more vocal about structural algorithmic boundaries and tradeoffs.",
-          "Ensure consistent visual posture under stressful scenarios."
-        ],
-        topics: [
-          config.category === "Technical" ? "Big-O Algorithms" : "STAR framework",
-          config.category === "System Design" ? "Sharding & Redis Caching" : "Conflict Resolution",
-          "MERN Architecture Models"
-        ],
-        questionsReviewed: chatMessages
-          .filter((msg) => msg.sender === "ai")
-          .map((msg, idx) => {
-            const userMsg = chatMessages.filter((m) => m.sender === "user")[idx];
-            return {
-              question: msg.text.includes("Welcome") ? msg.text.split("Let's begin. ")[1] || msg.text : msg.text,
-              answer: userMsg ? userMsg.text : "No response provided.",
-              ideal: config.category === "Technical" 
-                ? "Ideally, present structured explanations starting with the conceptual model, followed by the algorithmic breakdown, and concluding with trade-offs like storage size and time bounds."
-                : "Deliver answers reflecting the STAR model: Situation, Task, Action, and the final Result metrics.",
-              score: Math.round(finalScore + (Math.random() * 10 - 5)),
-              feedback: "Excellent voice stability. Focus slightly more on code structure optimization."
-            };
-          }),
-        recommendation: finalScore >= 80 ? "Ready for Placements" : "Needs Practice"
-      };
+    try {
+      const interviewId = activeInterview?._id;
+      if (!interviewId) {
+        throw new Error("No active interview session found.");
+      }
 
-      setHistoryList((prev) => [newReport, ...prev]);
-      setActiveReport(newReport);
+      // Fetch report details directly from backend API
+      const data = await apiGetInterviewReport(interviewId);
+      if (data && data.success) {
+        setActiveReport(data.report);
+        setInterviewCompleted(true);
+        setCurrentView("complete");
+      } else {
+        throw new Error("Failed to load interview report.");
+      }
+    } catch (err) {
+      console.error("Error finalizing interview:", err);
+      setApiError(err.response?.data?.message || "Failed to finalize interview report.");
+      setIsError(true);
+    } finally {
       setIsLoading(false);
-      setCurrentView("complete");
-    }, 800);
+    }
   };
 
-  const handleOpenReport = (report) => {
-    setActiveReport(report);
+  const handleOpenReport = async (reportOrId) => {
+    const reportId = typeof reportOrId === 'string' ? reportOrId : (reportOrId.id || reportOrId._id);
+    if (!reportId) return;
+
+    setReportLoading(true);
     setCurrentView("report");
+    try {
+      const data = await apiGetInterviewReport(reportId);
+      if (data && data.success) {
+        setActiveReport(data.report);
+      } else {
+        setApiError("Failed to fetch report details.");
+      }
+    } catch (err) {
+      console.error("Error fetching report:", err);
+      setApiError(err.response?.data?.message || "Failed to retrieve interview report.");
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   const handleDeleteHistory = (id, e) => {
@@ -1390,10 +1530,9 @@ const MockInterview = () => {
                         {/* Resume Integration Card */}
                         <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden space-y-4 shadow-lg text-left">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                          
                           <div className="flex justify-between items-center pb-3 border-b border-white/5">
                             <div>
-                              <h3 className="text-sm font-bold text-white">Resume Context</h3>
+                              <h3 className="text-sm font-bold text-white">Resume Personalization</h3>
                               <p className="text-xs text-slate-400 mt-0.5 font-light">Personalize the interview using your latest analyzed resume.</p>
                             </div>
                             
@@ -1443,17 +1582,22 @@ const MockInterview = () => {
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl space-y-3">
-                                    <p className="text-xs text-red-400 font-light flex items-center gap-1.5">
-                                      <AlertCircle className="w-4.5 h-4.5 text-red-400 shrink-0" />
-                                      No analyzed resume found. Upload your resume from Resume Analyzer to enable personalized interviews.
-                                    </p>
+                                  <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-3">
+                                    <div className="flex gap-2.5 items-start">
+                                      <AlertCircle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
+                                      <div>
+                                        <p className="text-xs font-bold text-amber-500">No analyzed resume found.</p>
+                                        <p className="text-xs text-slate-400 font-light mt-1 leading-relaxed">
+                                          Analyze your resume to unlock personalized interview questions based on your projects, experience, and skills.
+                                        </p>
+                                      </div>
+                                    </div>
                                     <button
                                       type="button"
                                       onClick={() => navigate("/resume-analyzer")}
-                                      className="px-4 py-2 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                                      className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-400 text-xs font-bold rounded-xl transition-all cursor-pointer"
                                     >
-                                      Go to Resume Analyzer
+                                      Analyze Resume
                                     </button>
                                   </div>
                                 )}
@@ -1498,38 +1642,37 @@ const MockInterview = () => {
                           </AnimatePresence>
                         </div>
 
-                        {/* Focus Areas multi-select tags */}
-                        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden space-y-4 shadow-lg text-left">
-                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                          <div>
-                            <h3 className="text-sm font-bold text-white">Focus Areas</h3>
-                            <p className="text-xs text-slate-400 mt-0.5 font-light">Choose the topics you want the AI interviewer to focus on.</p>
+                        {/* Interview Coverage (AI-driven static info card) */}
+                        <div className="bg-gradient-to-br from-indigo-950/15 via-purple-950/10 to-slate-950/30 border border-indigo-500/20 rounded-3xl p-6 relative overflow-hidden space-y-4 shadow-[0_4px_30px_rgba(0,0,0,0.4)] text-left">
+                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
+                          <div className="flex items-start gap-4">
+                            <div className="p-3 bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 rounded-2xl text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.15)] mt-0.5 animate-pulse">
+                              <Sparkles className="w-5 h-5 text-indigo-400" />
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                                AI Interview Strategy
+                              </h3>
+                              <p className="text-xs text-slate-400 mt-1 font-light leading-relaxed">
+                                The AI interviewer automatically personalizes your interview based on your resume, selected role, company, interview type, and difficulty level. No manual topic selection is required.
+                              </p>
+                            </div>
                           </div>
                           
-                          <div className="flex flex-wrap gap-2 pt-2">
-                            {FOCUS_AREAS_LIST.map((topic) => {
-                              const isSelected = config.focusAreas.includes(topic);
-                              return (
-                                <button
-                                  key={topic}
-                                  type="button"
-                                  onClick={() => {
-                                    if (isSelected) {
-                                      setConfig(prev => ({ ...prev, focusAreas: prev.focusAreas.filter(t => t !== topic) }));
-                                    } else {
-                                      setConfig(prev => ({ ...prev, focusAreas: [...prev.focusAreas, topic] }));
-                                    }
-                                  }}
-                                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-300 cursor-pointer ${
-                                    isSelected 
-                                      ? "bg-gradient-to-r from-indigo-500/25 to-purple-500/20 border-indigo-500 text-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.1)]" 
-                                      : "bg-slate-950/20 border-white/5 text-slate-400 hover:border-white/10"
-                                  }`}
-                                >
-                                  {topic}
-                                </button>
-                              );
-                            })}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1 text-[11px]">
+                            {[
+                              { label: "Resume & Experience", desc: "Personalized questions from your projects, experience, and achievements." },
+                              { label: "Role Knowledge", desc: "Role-specific concepts, tools, workflows, and responsibilities." },
+                              { label: "Core Competencies", desc: "Foundational knowledge required for the selected profession." },
+                              { label: "Problem Solving", desc: "Analytical thinking, decision-making, and real-world scenarios." },
+                              { label: "Communication", desc: "Professional communication, teamwork, leadership, and collaboration." },
+                              { label: "Company Alignment", desc: "Motivation, culture fit, career goals, and behavioral assessment." }
+                            ].map((item, index) => (
+                              <div key={index} className="bg-slate-950/30 border border-white/[0.04] p-3 rounded-xl space-y-1 hover:border-indigo-500/20 transition-all duration-300 animate-fadeIn">
+                                <span className="font-bold text-indigo-300 block">{item.label}</span>
+                                <span className="text-[10px] text-slate-400 font-light block leading-relaxed">{item.desc}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
 
@@ -1574,17 +1717,17 @@ const MockInterview = () => {
 
                           <div className="space-y-3.5 text-xs text-slate-400 pt-2 border-t border-white/5">
                             <div className="flex justify-between">
-                              <span>Type:</span>
+                              <span>Interview Type:</span>
                               <span className="font-bold text-white">{config.category}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span>Company:</span>
+                              <span>Target Company:</span>
                               <span className="font-bold text-white truncate max-w-[150px]">
                                 {config.company === "Other" ? (config.customCompany || "Not Specified") : config.company}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span>Job Role:</span>
+                              <span>Target Role:</span>
                               <span className="font-bold text-white truncate max-w-[150px]">
                                 {config.jobRole === "Other" ? (config.customRole || "Not Specified") : config.jobRole}
                               </span>
@@ -1598,28 +1741,24 @@ const MockInterview = () => {
                               <span className="font-bold text-white">{config.duration} mins</span>
                             </div>
                             <div className="flex justify-between">
-                              <span>Resume Sync:</span>
-                              <span className={`font-bold ${config.useResume ? "text-purple-400" : "text-slate-500"}`}>
-                                {config.useResume ? "Enabled" : "Disabled"}
+                              <span>Resume Personalization:</span>
+                              <span className={`font-bold ${(!config.useResume) ? "text-slate-500" : latestResume ? "text-purple-400" : "text-amber-400"}`}>
+                                {!config.useResume ? "Disabled" : latestResume ? "Personalized" : "Standard"}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span>Focus Areas:</span>
-                              <span className="font-bold text-white truncate max-w-[150px]">
-                                {config.focusAreas.length > 0 ? config.focusAreas.join(", ") : "None"}
+                              <span>AI Coverage:</span>
+                              <span className={`font-bold ${(config.useResume && latestResume) ? "text-purple-400" : "text-indigo-400"}`}>
+                                {(config.useResume && latestResume) ? "Personalized" : "Adaptive"}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span>Questions:</span>
+                              <span>Estimated Questions:</span>
                               <span className="font-bold text-white">≈ {config.questionCount} Qs</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Language:</span>
                               <span className="font-bold text-white">{config.language}</span>
-                            </div>
-                            <div className="flex justify-between pt-2 border-t border-white/5 text-[11px]">
-                              <span>Evaluation Latency:</span>
-                              <span className="font-semibold text-indigo-400">≈ 2 Minutes</span>
                             </div>
                           </div>
 
@@ -1754,12 +1893,12 @@ const MockInterview = () => {
                       {/* Question Progress bar */}
                       <div className="bg-slate-950/20 border-b border-white/5 px-5 py-2.5 flex items-center justify-between shrink-0">
                         <span className="text-xs text-slate-400">
-                          Question <span className="font-bold text-white">{activeQuestionIdx + 1}</span> of <span className="font-bold text-slate-300">{config.questionCount}</span>
+                          Question <span className="font-bold text-white">{progress.currentQuestionNumber}</span> of <span className="font-bold text-slate-300">{progress.totalQuestions}</span>
                         </span>
                         <div className="w-48 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5 ml-4">
                           <div 
                             className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300"
-                            style={{ width: `${((activeQuestionIdx + 1) / config.questionCount) * 100}%` }}
+                            style={{ width: `${progress.progressPercentage}%` }}
                           />
                         </div>
                       </div>
@@ -1800,10 +1939,15 @@ const MockInterview = () => {
                               <div className="w-8.5 h-8.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shrink-0 text-sm font-bold animate-pulse">
                                 AI
                               </div>
-                              <div className="p-4 bg-slate-900/40 border border-white/5 rounded-2xl rounded-tl-none flex items-center gap-1">
-                                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                              <div className="flex flex-col gap-1.5">
+                                <div className="p-4 bg-slate-900/40 border border-white/5 rounded-2xl rounded-tl-none flex items-center gap-1 w-fit">
+                                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                                </div>
+                                {loadingMessage && (
+                                  <span className="text-[10px] text-indigo-400/80 italic pl-1">{loadingMessage}</span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1814,6 +1958,21 @@ const MockInterview = () => {
 
                       {/* Sticky Input container */}
                       <div className="p-4 border-t border-white/5 bg-slate-950/40 shrink-0">
+                        {apiError && (
+                          <div className="mb-3.5 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-between gap-3 text-xs text-red-400 animate-pulse">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 shrink-0" />
+                              <span>{apiError}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleRetry}
+                              className="px-3.5 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold rounded-lg transition-colors cursor-pointer focus:outline-none"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        )}
                         <form
                           onSubmit={(e) => {
                             e.preventDefault();
@@ -1841,7 +2000,10 @@ const MockInterview = () => {
                             placeholder={isPaused ? "Interview is paused..." : "Type your answer and explanation here..."}
                             disabled={isPaused || isTyping}
                             value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
+                            onChange={(e) => {
+                              setChatInput(e.target.value);
+                              if (apiError) setApiError("");
+                            }}
                             className="flex-1 bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600 disabled:opacity-50"
                           />
 
@@ -1976,25 +2138,25 @@ const MockInterview = () => {
                         <div className="p-4 bg-slate-950/30 border border-white/5 rounded-2xl text-left">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Overall Score</span>
                           <span className="text-2xl font-black text-white mt-1.5 block">
-                            {activeReport ? activeReport.score : 0}%
+                            {activeReport ? (activeReport.overallScore ?? activeReport.score) : 0}%
                           </span>
                         </div>
                         <div className="p-4 bg-slate-950/30 border border-white/5 rounded-2xl text-left">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Communication</span>
                           <span className="text-2xl font-black text-white mt-1.5 block">
-                            {activeReport ? activeReport.metrics.communication : 0}%
+                            {activeReport ? (activeReport.communicationScore ?? activeReport.metrics?.communication) : 0}%
                           </span>
                         </div>
                         <div className="p-4 bg-slate-950/30 border border-white/5 rounded-2xl text-left">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Technical Accuracy</span>
                           <span className="text-2xl font-black text-white mt-1.5 block">
-                            {activeReport ? activeReport.metrics.technicalAccuracy : 0}%
+                            {activeReport ? (activeReport.technicalScore ?? activeReport.metrics?.technicalAccuracy) : 0}%
                           </span>
                         </div>
                         <div className="p-4 bg-slate-950/30 border border-white/5 rounded-2xl text-left">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Confidence Rating</span>
                           <span className="text-2xl font-black text-white mt-1.5 block">
-                            {activeReport ? activeReport.metrics.confidence : 0}%
+                            {activeReport ? (activeReport.confidenceScore ?? activeReport.metrics?.confidence) : 0}%
                           </span>
                         </div>
                       </div>
@@ -2033,199 +2195,262 @@ const MockInterview = () => {
                 )}
 
                 {/* 5. INTERVIEW REPORT VIEW */}
-                {currentView === "report" && activeReport && (
-                  <motion.div
-                    key="report"
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -15 }}
-                    className="space-y-8 text-left"
-                  >
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div>
-                        <button onClick={() => setCurrentView("history")} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors mb-2 focus:outline-none">
-                          <ChevronLeft className="w-4 h-4" />
-                          Back to History
-                        </button>
-                        <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-2">
-                          <AwardIcon className="w-8 h-8 text-indigo-400" />
-                          AI Evaluation Report
-                        </h1>
-                        <p className="text-sm text-slate-400 mt-1">Detailed feedback report for {activeReport.role} mock interview at {activeReport.company}.</p>
-                      </div>
-                      <div className="flex gap-2.5">
-                        <button
-                          onClick={() => alert("Downloading PDF summary report...")}
-                          className="px-4 py-2 border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-xs font-bold rounded-xl text-slate-300 hover:text-white transition-all cursor-pointer"
-                        >
-                          Download PDF
-                        </button>
-                        <button
-                          onClick={() => alert("Copied shareable report link to clipboard.")}
-                          className="px-4 py-2 border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-xs font-bold rounded-xl text-slate-300 hover:text-white transition-all cursor-pointer"
-                        >
-                          Share Report
-                        </button>
+                {currentView === "report" && (
+                  reportLoading ? (
+                    <div className="space-y-6">
+                      <div className="flex justify-between items-center"><Skeleton className="h-10 w-1/4" /><Skeleton className="h-10 w-32" /></div>
+                      <Skeleton className="h-[280px] w-full" />
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-32 w-full" />
                       </div>
                     </div>
-
-                    {/* Overview Cards Metric Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-7 gap-4">
-                      {[
-                        { label: "Overall Score", val: `${activeReport.score}%`, col: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25" },
-                        { label: "Communication", val: `${activeReport.metrics.communication}%`, col: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-                        { label: "Tech Knowledge", val: `${activeReport.metrics.technicalAccuracy}%`, col: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
-                        { label: "Problem Solving", val: `${activeReport.score + 2 > 100 ? 98 : activeReport.score + 2}%`, col: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
-                        { label: "Confidence", val: `${activeReport.metrics.confidence}%`, col: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
-                        { label: "Grammar Rating", val: "92%", col: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20" },
-                        { label: "Professionalism", val: `${activeReport.metrics.professionalism}%`, col: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" }
-                      ].map((item, idx) => (
-                        <div key={idx} className={`p-4 rounded-2xl border text-center relative overflow-hidden flex flex-col justify-between ${item.col}`}>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-normal">{item.label}</span>
-                          <span className="text-xl font-black text-white mt-3 block">{item.val}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Performance Radar chart & Strengths row */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                      {/* Radar Chart (5 columns) */}
-                      <div className="lg:col-span-5 bg-white/[0.02] border border-white/10 rounded-3xl p-6 flex flex-col justify-between shadow-lg h-[380px]">
-                        <div className="text-left mb-2">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dimension Analysis</span>
-                          <h3 className="text-base font-bold text-white mt-0.5">Competency Breakdown</h3>
-                        </div>
-
-                        <div className="flex-1 w-full relative flex items-center justify-center">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RadarChart cx="50%" cy="50%" outerRadius="70%" data={activeReport.radarData}>
-                              <PolarGrid stroke="rgba(255, 255, 255, 0.05)" />
-                              <PolarAngleAxis dataKey="subject" stroke="#64748b" fontSize={11} />
-                              <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="rgba(255, 255, 255, 0.05)" />
-                              <Radar name="Competency" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} />
-                              <RechartsTooltip contentStyle={{ background: "#080E24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", fontSize: "12px", color: "#fff" }} />
-                            </RadarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      {/* Strengths & Weaknesses (7 columns) */}
-                      <div className="lg:col-span-7 space-y-6">
-                        {/* Strengths */}
-                        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 text-left relative overflow-hidden shadow-md">
-                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-                          <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2 mb-3">
-                            <CheckCircle2 className="w-4 h-4" />
-                            Core Strengths Identified
-                          </h3>
-                          <ul className="space-y-2.5">
-                            {activeReport.strengths.map((str, idx) => (
-                              <li key={idx} className="text-xs text-slate-300 font-light flex items-start gap-2 leading-relaxed">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
-                                {str}
-                              </li>
-                            ))}
-                          </ul>
+                  ) : activeReport ? (() => {
+                    const radarData = [
+                      { subject: "Confidence", value: activeReport.confidenceScore ?? activeReport.metrics?.confidence ?? 0 },
+                      { subject: "Communication", value: activeReport.communicationScore ?? activeReport.metrics?.communication ?? 0 },
+                      { subject: "Technical Accuracy", value: activeReport.technicalScore ?? activeReport.metrics?.technicalAccuracy ?? 0 },
+                      { subject: "Problem Solving", value: activeReport.problemSolvingScore ?? activeReport.score ?? 0 },
+                      { subject: "Professionalism", value: activeReport.confidenceScore ?? activeReport.metrics?.professionalism ?? 0 },
+                      { subject: "Eye Contact", value: activeReport.confidenceScore ?? activeReport.metrics?.eyeContact ?? 0 }
+                    ];
+                    return (
+                      <motion.div
+                        key="report"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                        className="space-y-8 text-left"
+                      >
+                        {/* Header */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                          <div>
+                            <button onClick={() => setCurrentView("history")} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors mb-2 focus:outline-none">
+                              <ChevronLeft className="w-4 h-4" />
+                              Back to History
+                            </button>
+                            <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                              <AwardIcon className="w-8 h-8 text-indigo-400" />
+                              AI Evaluation Report
+                            </h1>
+                            <p className="text-sm text-slate-400 mt-1">Detailed feedback report for {activeReport.role} mock interview at {activeReport.company}.</p>
+                          </div>
+                          <div className="flex gap-2.5">
+                            <button
+                              onClick={() => alert("Downloading PDF summary report...")}
+                              className="px-4 py-2 border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-xs font-bold rounded-xl text-slate-300 hover:text-white transition-all cursor-pointer"
+                            >
+                              Download PDF
+                            </button>
+                            <button
+                              onClick={() => alert("Copied shareable report link to clipboard.")}
+                              className="px-4 py-2 border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-xs font-bold rounded-xl text-slate-300 hover:text-white transition-all cursor-pointer"
+                            >
+                              Share Report
+                            </button>
+                          </div>
                         </div>
 
-                        {/* Weaknesses */}
-                        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 text-left relative overflow-hidden shadow-md">
-                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-red-500/20 to-transparent" />
-                          <h3 className="text-sm font-bold text-red-400 flex items-center gap-2 mb-3">
-                            <AlertCircle className="w-4 h-4" />
-                            Areas of Improvement
-                          </h3>
-                          <ul className="space-y-2.5">
-                            {activeReport.weaknesses.map((weak, idx) => (
-                              <li key={idx} className="text-xs text-slate-300 font-light flex items-start gap-2 leading-relaxed">
-                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-1.5" />
-                                {weak}
-                              </li>
-                            ))}
-                          </ul>
+                        {/* Overview Cards Metric Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-7 gap-4">
+                          {[
+                            { label: "Overall Score", val: `${activeReport.overallScore ?? activeReport.score}%`, col: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25" },
+                            { label: "Communication", val: `${activeReport.communicationScore ?? activeReport.metrics?.communication}%`, col: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+                            { label: "Tech Knowledge", val: `${activeReport.technicalScore ?? activeReport.metrics?.technicalAccuracy}%`, col: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
+                            { label: "Problem Solving", val: `${activeReport.problemSolvingScore ?? (activeReport.score ? (activeReport.score + 2 > 100 ? 98 : activeReport.score + 2) : 0)}%`, col: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+                            { label: "Confidence", val: `${activeReport.confidenceScore ?? activeReport.metrics?.confidence}%`, col: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
+                            { label: "Grammar Rating", val: "92%", col: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20" },
+                            { label: "Professionalism", val: `${activeReport.confidenceScore ?? activeReport.metrics?.professionalism}%`, col: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" }
+                          ].map((item, idx) => (
+                            <div key={idx} className={`p-4 rounded-2xl border text-center relative overflow-hidden flex flex-col justify-between ${item.col}`}>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-normal">{item.label}</span>
+                              <span className="text-xl font-black text-white mt-3 block">{item.val}</span>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Recommended topics */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                      <h3 className="text-sm font-bold text-white mb-4">Recommended Topics to Study</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {activeReport.topics.map((topic, idx) => (
-                          <span key={idx} className="text-xs bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-full font-bold">
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Question Review Accordion */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-white">Question-by-Question Review</h3>
-                      <div className="space-y-3">
-                        {activeReport.questionsReviewed.map((q, idx) => (
-                          <div key={idx} className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 space-y-4">
-                            <div className="flex justify-between items-start border-b border-white/5 pb-3">
-                              <h4 className="font-semibold text-white text-sm max-w-xl">
-                                Q{idx + 1}: {q.question}
-                              </h4>
-                              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md border ${
-                                q.score >= 80 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400"
-                              }`}>
-                                Accuracy: {q.score}%
-                              </span>
+                        {/* Performance Radar chart & Strengths row */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                          {/* Radar Chart (5 columns) */}
+                          <div className="lg:col-span-5 bg-white/[0.02] border border-white/10 rounded-3xl p-6 flex flex-col justify-between shadow-lg h-[380px]">
+                            <div className="text-left mb-2">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dimension Analysis</span>
+                              <h3 className="text-base font-bold text-white mt-0.5">Competency Breakdown</h3>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                              {/* User Answer */}
-                              <div className="space-y-1.5">
-                                <span className="block font-bold text-slate-400 uppercase tracking-wider">Your Answer</span>
-                                <div className="p-3 bg-slate-950/40 border border-white/5 rounded-xl text-slate-300 leading-relaxed font-light min-h-[60px]">
-                                  {q.answer}
-                                </div>
-                              </div>
-                              {/* Ideal Answer */}
-                              <div className="space-y-1.5">
-                                <span className="block font-bold text-slate-400 uppercase tracking-wider">Ideal Response Model</span>
-                                <div className="p-3 bg-indigo-950/20 border border-indigo-500/15 rounded-xl text-indigo-300 leading-relaxed font-light min-h-[60px]">
-                                  {q.ideal}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Feedbacks */}
-                            <div className="p-3 bg-slate-950/20 border border-white/5 rounded-xl text-xs flex gap-2">
-                              <span className="font-bold text-slate-400 uppercase tracking-wider">Feedback:</span>
-                              <span className="text-slate-300 font-light">{q.feedback}</span>
+                            <div className="flex-1 w-full relative flex items-center justify-center">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                                  <PolarGrid stroke="rgba(255, 255, 255, 0.05)" />
+                                  <PolarAngleAxis dataKey="subject" stroke="#64748b" fontSize={11} />
+                                  <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="rgba(255, 255, 255, 0.05)" />
+                                  <Radar name="Competency" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} />
+                                  <RechartsTooltip contentStyle={{ background: "#080E24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", fontSize: "12px", color: "#fff" }} />
+                                </RadarChart>
+                              </ResponsiveContainer>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
 
-                    {/* Final Placement Recommendation Card */}
-                    <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
-                      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
-                      <div className="space-y-1">
-                        <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
-                          <AwardIcon className="w-5 h-5 text-purple-400 animate-pulse" />
-                          Final Placement Recommendation
-                        </h3>
-                        <p className="text-xs text-slate-400 font-light leading-normal max-w-xl">
-                          Based on speech clarity, technical precision, and confidence indicators, we have mapped your readiness classification.
-                        </p>
-                      </div>
-                      <div className={`px-6 py-3.5 rounded-2xl border text-center shrink-0 font-black text-sm tracking-wide uppercase ${
-                        activeReport.recommendation === "Ready for Placements" 
-                          ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" 
-                          : "bg-amber-500/10 border-amber-500/25 text-amber-400"
-                      }`}>
-                        {activeReport.recommendation}
-                      </div>
+                          {/* Strengths & Weaknesses (7 columns) */}
+                          <div className="lg:col-span-7 space-y-6">
+                            {/* Strengths */}
+                            <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 text-left relative overflow-hidden shadow-md">
+                              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+                              <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2 mb-3">
+                                <CheckCircle2 className="w-4 h-4" />
+                                Core Strengths Identified
+                              </h3>
+                              <ul className="space-y-2.5">
+                                {(activeReport.strengths || []).map((str, idx) => (
+                                  <li key={idx} className="text-xs text-slate-300 font-light flex items-start gap-2 leading-relaxed">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
+                                    {str}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            {/* Weaknesses */}
+                            <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 text-left relative overflow-hidden shadow-md">
+                              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-red-500/20 to-transparent" />
+                              <h3 className="text-sm font-bold text-red-400 flex items-center gap-2 mb-3">
+                                <AlertCircle className="w-4 h-4" />
+                                Areas of Improvement
+                              </h3>
+                              <ul className="space-y-2.5">
+                                {(activeReport.weaknesses || []).map((weak, idx) => (
+                                  <li key={idx} className="text-xs text-slate-300 font-light flex items-start gap-2 leading-relaxed">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-1.5" />
+                                    {weak}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* AI Overall Feedback & Career Advice */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 text-left relative overflow-hidden shadow-md">
+                            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                            <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2 mb-3">
+                              <Sparkles className="w-4 h-4" />
+                              Overall AI Evaluation
+                            </h3>
+                            <p className="text-xs text-slate-300 font-light leading-relaxed whitespace-pre-line">
+                              {activeReport.overallFeedback || activeReport.interviewSummary}
+                            </p>
+                          </div>
+                          
+                          <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 text-left relative overflow-hidden shadow-md">
+                            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
+                            <h3 className="text-sm font-bold text-purple-400 flex items-center gap-2 mb-3">
+                              <Briefcase className="w-4 h-4" />
+                              Career & Preparation Advice
+                            </h3>
+                            <p className="text-xs text-slate-300 font-light leading-relaxed whitespace-pre-line">
+                              {activeReport.careerAdvice}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Recommended next steps / study items */}
+                        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
+                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                          <h3 className="text-sm font-bold text-white mb-4">Recommended Next Steps</h3>
+                          <div className="flex flex-col gap-2.5">
+                            {(activeReport.recommendations && activeReport.recommendations.length > 0
+                              ? activeReport.recommendations
+                              : ["Review resume project descriptions and architecture details", "Strengthen core concepts for target role", "Practice common behavioral and STAR method scenarios"]
+                            ).map((item, idx) => (
+                              <div key={idx} className="flex items-start gap-2.5 text-xs text-slate-300 font-light">
+                                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold shrink-0 mt-0.5">
+                                  {idx + 1}
+                                </span>
+                                <span className="leading-relaxed">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Question Review Accordion */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-bold text-white">Question-by-Question Review</h3>
+                          <div className="space-y-3">
+                            {(activeReport.questionsReviewed || []).map((q, idx) => (
+                              <div key={idx} className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 space-y-4">
+                                <div className="flex justify-between items-start border-b border-white/5 pb-3">
+                                  <h4 className="font-semibold text-white text-sm max-w-xl">
+                                    Q{idx + 1}: {q.question}
+                                  </h4>
+                                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md border ${
+                                    q.score >= 80 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                                  }`}>
+                                    Accuracy: {q.score}%
+                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                  {/* User Answer */}
+                                  <div className="space-y-1.5">
+                                    <span className="block font-bold text-slate-400 uppercase tracking-wider">Your Answer</span>
+                                    <div className="p-3 bg-slate-950/40 border border-white/5 rounded-xl text-slate-300 leading-relaxed font-light min-h-[60px]">
+                                      {q.answer}
+                                    </div>
+                                  </div>
+                                  {/* Ideal Answer */}
+                                  <div className="space-y-1.5">
+                                    <span className="block font-bold text-slate-400 uppercase tracking-wider">Ideal Response Model</span>
+                                    <div className="p-3 bg-indigo-950/20 border border-indigo-500/15 rounded-xl text-indigo-300 leading-relaxed font-light min-h-[60px]">
+                                      {q.ideal}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Feedbacks */}
+                                <div className="p-3 bg-slate-950/20 border border-white/5 rounded-xl text-xs flex gap-2">
+                                  <span className="font-bold text-slate-400 uppercase tracking-wider">Feedback:</span>
+                                  <span className="text-slate-300 font-light">{q.feedback}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Final Placement Recommendation Card */}
+                        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
+                          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
+                          <div className="space-y-1">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
+                              <AwardIcon className="w-5 h-5 text-purple-400 animate-pulse" />
+                              Final Placement Recommendation
+                            </h3>
+                            <p className="text-xs text-slate-400 font-light leading-normal max-w-xl">
+                              Based on speech clarity, technical precision, and confidence indicators, we have mapped your readiness classification.
+                            </p>
+                          </div>
+                          <div className={`px-6 py-3.5 rounded-2xl border text-center shrink-0 font-black text-sm tracking-wide uppercase ${
+                            (activeReport.readinessLevel === "Placement Ready" || activeReport.readinessLevel === "Excellent Candidate" || activeReport.recommendation === "Ready for Placements")
+                              ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" 
+                              : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+                          }`}>
+                            {activeReport.readinessLevel ?? activeReport.recommendation}
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })() : (
+                    <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-8 text-center max-w-lg mx-auto space-y-4">
+                      <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
+                      <h3 className="text-lg font-bold text-white">Report Not Found</h3>
+                      <p className="text-sm text-slate-400">Failed to load this interview report. Please verify session details and try again.</p>
+                      <button onClick={() => setCurrentView("history")} className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all cursor-pointer">
+                        Back to History
+                      </button>
                     </div>
-                  </motion.div>
+                  )
                 )}
 
                 {/* 6. INTERVIEW HISTORY VIEW */}
@@ -2286,7 +2511,15 @@ const MockInterview = () => {
                     <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg">
                       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
                       
-                      {filteredHistory.length === 0 ? (
+                      {historyLoading ? (
+                        <div className="space-y-4 py-6">
+                          <Skeleton className="h-8 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                        </div>
+                      ) : filteredHistory.length === 0 ? (
                         <div className="py-12 text-center max-w-sm mx-auto space-y-4">
                           <History className="w-12 h-12 text-slate-600 mx-auto" />
                           <h3 className="text-base font-bold text-white">No Mock Records Found</h3>
@@ -2342,7 +2575,7 @@ const MockInterview = () => {
                                   <td className="py-3.5 text-right">
                                     <div className="flex gap-2 justify-end">
                                       <button
-                                        onClick={() => handleOpenReport(item)}
+                                        onClick={() => handleOpenReport(item.id)}
                                         className="px-3 py-1.5 text-xs font-bold text-indigo-400 border border-indigo-500/25 bg-indigo-500/5 hover:border-indigo-500 rounded-lg transition-all cursor-pointer focus:outline-none"
                                       >
                                         Report
@@ -2352,14 +2585,16 @@ const MockInterview = () => {
                                           setConfig({
                                             category: item.category,
                                             jobRole: item.role,
+                                            customRole: "",
                                             company: item.company,
+                                            customCompany: "",
                                             difficulty: item.difficulty,
                                             duration: parseInt(item.duration) || 30,
-                                            useResume: true,
-                                            questionCount: 5,
+                                            useResume: item.resumeEnabled !== false,
+                                            questionCount: 15,
                                             language: "English"
                                           });
-                                          handleLaunchInterview();
+                                          setCurrentView("setup");
                                         }}
                                         className="px-3 py-1.5 text-xs font-bold text-slate-300 border border-white/10 hover:border-white/20 bg-white/5 rounded-lg transition-all cursor-pointer focus:outline-none"
                                       >
@@ -2378,6 +2613,33 @@ const MockInterview = () => {
                               ))}
                             </tbody>
                           </table>
+                        </div>
+                      )}
+
+                      {/* Pagination Controls */}
+                      {filteredHistory.length > 0 && historyTotalPages > 1 && (
+                        <div className="flex justify-between items-center mt-6 pt-4 border-t border-white/5">
+                          <span className="text-xs text-slate-400 font-light">
+                            Page <span className="font-bold text-white">{historyPage}</span> of <span className="font-bold text-slate-300">{historyTotalPages}</span>
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={historyPage <= 1 || historyLoading}
+                              onClick={() => setHistoryPage(prev => prev - 1)}
+                              className="p-2 rounded-lg border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={historyPage >= historyTotalPages || historyLoading}
+                              onClick={() => setHistoryPage(prev => prev + 1)}
+                              className="p-2 rounded-lg border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

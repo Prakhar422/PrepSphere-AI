@@ -2,40 +2,9 @@ import mongoose from 'mongoose';
 import InterviewSession from '../models/InterviewSession.js';
 import ResumeAnalysis from '../models/ResumeAnalysis.js';
 import { validateStartRequest, validateAnswerRequest } from '../utils/interviewValidation.js';
-import { generateFirstQuestion, evaluateInterviewAnswer } from '../services/geminiInterviewService.js';
+import { generateFirstQuestion, evaluateInterviewAnswer, generateInterviewReport } from '../services/geminiInterviewService.js';
 import { DURATION_QUESTION_MAP } from '../config/interviewConfig.js';
 
-/**
- * Reusable helper to generate fallback focus areas dynamically based on target role.
- * 
- * @param {string} role - Candidate job role
- * @returns {Array<string>} Fallback core concepts
- */
-const getRoleCoreConcepts = (role) => {
-  const roleLower = (role || '').toLowerCase();
-  
-  if (roleLower.includes('frontend') || roleLower.includes('react') || roleLower.includes('ui') || roleLower.includes('web')) {
-    return ['Core React concepts', 'Frontend Architecture', 'Web Performance & Optimization'];
-  }
-  if (roleLower.includes('backend') || roleLower.includes('node') || roleLower.includes('api') || roleLower.includes('server')) {
-    return ['Node.js fundamentals', 'API Design & Security', 'Database Schema Management'];
-  }
-  if (roleLower.includes('full stack') || roleLower.includes('mern') || roleLower.includes('fullstack')) {
-    return ['Full Stack Architecture', 'MERN Stack Patterns', 'State Management & Sync'];
-  }
-  if (roleLower.includes('data scientist') || roleLower.includes('data analyst') || roleLower.includes('science') || roleLower.includes('analyst')) {
-    return ['Data analysis methodologies', 'Statistical modeling', 'SQL Query Optimization'];
-  }
-  if (roleLower.includes('ai') || roleLower.includes('machine learning') || roleLower.includes('ml')) {
-    return ['Machine learning algorithms', 'Model evaluation metrics', 'AI system deployment'];
-  }
-  if (roleLower.includes('devops') || roleLower.includes('cloud') || roleLower.includes('aws')) {
-    return ['CI/CD deployment pipelines', 'Containerization & Docker', 'Cloud system architecture'];
-  }
-  
-  // Default software engineer / CS fundamentals
-  return ['Computer Science fundamentals', 'Data Structures', 'Algorithmic complexity (Big O)'];
-};
 
 /**
  * Helper to construct recruiter-oriented resume profiles for Gemini prompts.
@@ -142,7 +111,6 @@ export const startInterview = async (req, res, next) => {
       difficulty,
       duration,
       language,
-      focusAreas,
       resumeEnabled,
       resumeId
     } = req.body;
@@ -232,12 +200,7 @@ export const startInterview = async (req, res, next) => {
       resumeContext = buildResumeContext(resume);
     }
 
-    // 5. Automatic Focus Areas Fallback
-    const resolvedFocusAreas = (focusAreas && focusAreas.length > 0)
-      ? focusAreas
-      : getRoleCoreConcepts(role === 'Other' ? req.body.customRole : role);
-
-    // 6. Request Gemini to generate the first question
+    // 5. Request Gemini to generate the first question
     const geminiStartTime = Date.now();
     let geminiResult;
     try {
@@ -247,7 +210,6 @@ export const startInterview = async (req, res, next) => {
         role: role === 'Other' ? req.body.customRole : role,
         difficulty,
         language,
-        focusAreas: resolvedFocusAreas,
         resumeContext
       });
     } catch (geminiError) {
@@ -260,11 +222,11 @@ export const startInterview = async (req, res, next) => {
     const geminiResponseTime = Date.now() - geminiStartTime;
     const { question: firstAIQuestion, usage, modelUsed } = geminiResult;
 
-    // 7. Calculate total questions count based on duration mapping
+    // 6. Calculate total questions count based on duration mapping
     const durationNum = Number(duration);
     const totalQuestions = DURATION_QUESTION_MAP[durationNum] || 15;
 
-    // 8. Create InterviewSession record
+    // 7. Create InterviewSession record
     const firstQuestionId = new mongoose.Types.ObjectId();
     let session;
     try {
@@ -276,7 +238,7 @@ export const startInterview = async (req, res, next) => {
         difficulty,
         duration: durationNum,
         language,
-        focusAreas: resolvedFocusAreas,
+        focusAreas: [],
         resumeEnabled: !!resumeEnabled,
         resumeRef,
         currentQuestionNumber: 1,
@@ -314,7 +276,7 @@ export const startInterview = async (req, res, next) => {
 
     const executionTime = Date.now() - startTime;
 
-    // 9. Structured logging for model inspects and usage optimizations
+    // 8. Structured logging for model inspects and usage optimizations
     console.log('--- INTERVIEW SESSION START INITIATED ---');
     console.log(`Interview Session ID: ${session._id}`);
     console.log(`Current Question Number: 1`);
@@ -329,7 +291,7 @@ export const startInterview = async (req, res, next) => {
     }
     console.log('-----------------------------------------');
 
-    // 10. Return payload to frontend (maintain full compatibility)
+    // 9. Return payload to frontend (maintain full compatibility)
     return res.status(201).json({
       success: true,
       interviewId: session._id,
@@ -340,7 +302,6 @@ export const startInterview = async (req, res, next) => {
         difficulty: session.difficulty,
         duration: session.duration,
         language: session.language,
-        focusAreas: session.focusAreas,
         resumeEnabled: session.resumeEnabled
       },
       firstQuestion: firstAIQuestion,
@@ -585,6 +546,102 @@ export const submitAnswer = async (req, res, next) => {
         { new: true }
       );
 
+      // --- GENERATE AND SAVE FINAL REPORT ON COMPLETION ---
+      // Calculate Overall Score and Skills Sub-scores
+      const historyList = finalSession.conversationHistory;
+      const scores = historyList.map(q => q.evaluation?.score || 0);
+      const totalScoreSum = scores.reduce((sum, val) => sum + val, 0);
+      const averageScore = scores.length > 0 ? (totalScoreSum / scores.length) : 0;
+      const overallScore = Math.round(averageScore * 10); // 0-100 percentage
+
+      // Deterministic Skill Scores (0-100)
+      const commScores = scores.filter((_, i) => i % 2 === 0);
+      const techScores = scores.filter((_, i) => i % 2 === 1);
+      
+      const communicationScore = commScores.length > 0
+        ? Math.round((commScores.reduce((sum, v) => sum + v, 0) / commScores.length) * 10)
+        : overallScore;
+      const technicalScore = techScores.length > 0
+        ? Math.round((techScores.reduce((sum, v) => sum + v, 0) / techScores.length) * 10)
+        : overallScore;
+      const problemSolvingScore = overallScore;
+      const confidenceScore = Math.round((communicationScore + technicalScore) / 2);
+
+      // Determine readiness label
+      const getReadinessLevel = (score) => {
+        if (score < 50) return 'Needs Improvement';
+        if (score < 70) return 'Developing';
+        if (score < 80) return 'Interview Ready';
+        if (score < 90) return 'Placement Ready';
+        return 'Excellent Candidate';
+      };
+      const readinessLevel = getReadinessLevel(overallScore);
+      const answeredQuestions = historyList.filter(q => q.status === 'ANSWERED').length;
+
+      // Make a single lightweight Gemini call for final summary components
+      let finalReport;
+      try {
+        const aiReport = await generateInterviewReport({
+          interviewType: finalSession.interviewType,
+          company: finalSession.company,
+          role: finalSession.role,
+          difficulty: finalSession.difficulty,
+          resumeContext,
+          conversationHistory: historyList,
+          overallScore
+        });
+
+        finalReport = {
+          overallScore,
+          communicationScore,
+          technicalScore,
+          problemSolvingScore,
+          confidenceScore,
+          readinessLevel: aiReport.placementReadiness || readinessLevel,
+          overallFeedback: aiReport.overallFeedback,
+          strengths: aiReport.strengths || [],
+          weaknesses: aiReport.weaknesses || [],
+          recommendations: aiReport.recommendations || [],
+          interviewSummary: aiReport.overallFeedback,
+          careerAdvice: aiReport.careerAdvice,
+          totalQuestions: finalSession.totalQuestions,
+          answeredQuestions,
+          averageScore,
+          completedAt: new Date()
+        };
+      } catch (aiErr) {
+        console.error('[GEMINI REPORT GENERATION ERROR] falling back to programmatic collation:', aiErr.message);
+        
+        // Build fallback report in case Gemini is completely unavailable
+        const allStrengths = Array.from(new Set(historyList.flatMap(q => q.evaluation?.strengths || []))).filter(Boolean);
+        const allWeaknesses = Array.from(new Set(historyList.flatMap(q => q.evaluation?.weaknesses || []))).filter(Boolean);
+        const allSuggestions = Array.from(new Set(historyList.flatMap(q => q.evaluation?.suggestions || []))).filter(Boolean);
+
+        finalReport = {
+          overallScore,
+          communicationScore,
+          technicalScore,
+          problemSolvingScore,
+          confidenceScore,
+          readinessLevel,
+          overallFeedback: `The candidate completed a ${finalSession.interviewType} interview for the ${finalSession.role} position at ${finalSession.company} with an overall accuracy of ${overallScore}%.`,
+          strengths: allStrengths.length > 0 ? allStrengths.slice(0, 3) : ['Demonstrated clear domain comprehension.'],
+          weaknesses: allWeaknesses.length > 0 ? allWeaknesses.slice(0, 2) : ['Could improve technical precision depth.'],
+          recommendations: allSuggestions.length > 0 ? allSuggestions.slice(0, 3) : ['Review advanced concepts in key technologies and CS fundamentals.'],
+          interviewSummary: `Completed ${answeredQuestions} out of ${finalSession.totalQuestions} questions.`,
+          careerAdvice: `Practice more technical and behavioral questions focused on ${finalSession.interviewType} paradigms.`,
+          totalQuestions: finalSession.totalQuestions,
+          answeredQuestions,
+          averageScore,
+          completedAt: new Date()
+        };
+      }
+
+      // Update document with final report details
+      await InterviewSession.findByIdAndUpdate(interviewId, {
+        $set: { report: finalReport }
+      });
+
       const executionTime = Date.now() - startTime;
       const evaluationTime = executionTime - geminiResponseTime;
 
@@ -690,6 +747,240 @@ export const submitAnswer = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Internal server error occurred while processing your answer.'
+    });
+  }
+};
+
+/**
+ * Retrieves the compiled AI Interview Report for a completed session.
+ * 
+ * @route GET /api/interview/:interviewId/report
+ * @access Private
+ */
+export const getInterviewReport = async (req, res, next) => {
+  try {
+    const { interviewId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Interview ID format.'
+      });
+    }
+
+    const session = await InterviewSession.findById(interviewId);
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Interview session not found.'
+      });
+    }
+
+    // Verify ownership
+    if (session.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Denied: You do not own this interview session.'
+      });
+    }
+
+    if (session.status === 'IN_PROGRESS') {
+      // Gracefully complete the session early and generate the report!
+      session.status = 'COMPLETED';
+      session.completedAt = new Date();
+      
+      const historyList = session.conversationHistory;
+      // Filter only answered questions for score calculations
+      const answeredList = historyList.filter(q => q.status === 'ANSWERED');
+      
+      const scores = answeredList.map(q => q.evaluation?.score || 0);
+      const totalScoreSum = scores.reduce((sum, val) => sum + val, 0);
+      const averageScore = scores.length > 0 ? (totalScoreSum / scores.length) : 0;
+      const overallScore = Math.round(averageScore * 10);
+
+      const commScores = scores.filter((_, i) => i % 2 === 0);
+      const techScores = scores.filter((_, i) => i % 2 === 1);
+      
+      const communicationScore = commScores.length > 0
+        ? Math.round((commScores.reduce((sum, v) => sum + v, 0) / commScores.length) * 10)
+        : overallScore;
+      const technicalScore = techScores.length > 0
+        ? Math.round((techScores.reduce((sum, v) => sum + v, 0) / techScores.length) * 10)
+        : overallScore;
+      const problemSolvingScore = overallScore;
+      const confidenceScore = Math.round((communicationScore + technicalScore) / 2);
+
+      const getReadinessLevel = (score) => {
+        if (score < 50) return 'Needs Improvement';
+        if (score < 70) return 'Developing';
+        if (score < 80) return 'Interview Ready';
+        if (score < 90) return 'Placement Ready';
+        return 'Excellent Candidate';
+      };
+      const readinessLevel = getReadinessLevel(overallScore);
+      const answeredQuestions = answeredList.length;
+
+      let resumeContext = '';
+      if (session.resumeEnabled && session.resumeRef) {
+        try {
+          const resume = await ResumeAnalysis.findById(session.resumeRef);
+          if (resume) {
+            resumeContext = buildResumeContext(resume);
+          }
+        } catch (err) {}
+      }
+
+      let finalReport;
+      try {
+        const aiReport = await generateInterviewReport({
+          interviewType: session.interviewType,
+          company: session.company,
+          role: session.role,
+          difficulty: session.difficulty,
+          resumeContext,
+          conversationHistory: historyList,
+          overallScore
+        });
+
+        finalReport = {
+          overallScore,
+          communicationScore,
+          technicalScore,
+          problemSolvingScore,
+          confidenceScore,
+          readinessLevel: aiReport.placementReadiness || readinessLevel,
+          overallFeedback: aiReport.overallFeedback,
+          strengths: aiReport.strengths || [],
+          weaknesses: aiReport.weaknesses || [],
+          recommendations: aiReport.recommendations || [],
+          interviewSummary: aiReport.overallFeedback,
+          careerAdvice: aiReport.careerAdvice,
+          totalQuestions: session.totalQuestions,
+          answeredQuestions,
+          averageScore,
+          completedAt: new Date()
+        };
+      } catch (aiErr) {
+        const allStrengths = Array.from(new Set(answeredList.flatMap(q => q.evaluation?.strengths || []))).filter(Boolean);
+        const allWeaknesses = Array.from(new Set(answeredList.flatMap(q => q.evaluation?.weaknesses || []))).filter(Boolean);
+        const allSuggestions = Array.from(new Set(answeredList.flatMap(q => q.evaluation?.suggestions || []))).filter(Boolean);
+
+        finalReport = {
+          overallScore,
+          communicationScore,
+          technicalScore,
+          problemSolvingScore,
+          confidenceScore,
+          readinessLevel,
+          overallFeedback: `The candidate completed a partial ${session.interviewType} interview for the ${session.role} position at ${session.company}.`,
+          strengths: allStrengths.length > 0 ? allStrengths.slice(0, 3) : ['Demonstrated clear domain comprehension.'],
+          weaknesses: allWeaknesses.length > 0 ? allWeaknesses.slice(0, 2) : ['Could improve technical precision depth.'],
+          recommendations: allSuggestions.length > 0 ? allSuggestions.slice(0, 3) : ['Review advanced concepts in key technologies and CS fundamentals.'],
+          interviewSummary: `Completed ${answeredQuestions} out of ${session.totalQuestions} questions.`,
+          careerAdvice: `Practice more technical and behavioral questions focused on ${session.interviewType} paradigms.`,
+          totalQuestions: session.totalQuestions,
+          answeredQuestions,
+          averageScore,
+          completedAt: new Date()
+        };
+      }
+
+      session.report = finalReport;
+      await session.save();
+    }
+
+    if (session.status !== 'COMPLETED' || !session.report) {
+      return res.status(400).json({
+        success: false,
+        message: 'Report is not available yet. Please complete the interview first.'
+      });
+    }
+
+    // Map conversationHistory to questionsReviewed format expected by the frontend
+    const questionsReviewed = session.conversationHistory
+      .filter(q => q.status === 'ANSWERED' || (q.evaluation && q.evaluation.score > 0))
+      .map(q => ({
+        question: q.question,
+        answer: q.userAnswer,
+        ideal: q.evaluation?.idealAnswer || 'No ideal answer details returned.',
+        score: q.evaluation?.percentageScore || (q.evaluation?.score * 10) || 0,
+        feedback: q.evaluation?.suggestions?.join(' ') || 'No feedback suggestions.',
+        strengths: q.evaluation?.strengths || [],
+        weaknesses: q.evaluation?.weaknesses || []
+      }));
+
+    return res.status(200).json({
+      success: true,
+      report: {
+        ...session.report.toObject(),
+        questionsReviewed
+      }
+    });
+  } catch (error) {
+    console.error('Error in getInterviewReport controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error occurred while retrieving report.'
+    });
+  }
+};
+
+/**
+ * Retrieves the paginated interview history for the authenticated user.
+ * 
+ * @route GET /api/interview/history
+ * @access Private
+ */
+export const getInterviewHistory = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { user: req.user._id };
+
+    const total = await InterviewSession.countDocuments(query);
+    const sessions = await InterviewSession.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const history = sessions.map(session => {
+      const durationText = `${session.duration} Min`;
+      return {
+        id: session._id,
+        category: session.interviewType,
+        company: session.company,
+        role: session.role,
+        difficulty: session.difficulty,
+        score: session.report ? session.report.overallScore : 0,
+        date: session.completedAt
+          ? new Date(session.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : new Date(session.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        duration: durationText,
+        status: session.status === 'COMPLETED'
+          ? (session.report && session.report.overallScore >= 80 ? 'Completed' : 'Needs Practice')
+          : session.status,
+        resumeEnabled: session.resumeEnabled,
+        hasReport: !!session.report
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      history,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error in getInterviewHistory controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error occurred while retrieving history.'
     });
   }
 };

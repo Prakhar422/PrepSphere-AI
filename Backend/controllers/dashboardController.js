@@ -1,5 +1,6 @@
 import ResumeAnalysis from '../models/ResumeAnalysis.js';
 import QuizAttempt from '../models/QuizAttempt.js';
+import InterviewSession from '../models/InterviewSession.js';
 
 /**
  * @desc    Fetch the summary of the latest resume analysis for the authenticated user
@@ -268,17 +269,45 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
         : "No aptitude activity yet. Start your first aptitude quiz.";
     }
 
-    // 3. Calculate Placement Readiness
-    const readiness = Math.round((averageAccuracy * 0.40) + (latestAtsScore * 0.60));
+    // 3. Fetch Mock Interview session stats
+    const allInterviewSessions = await InterviewSession.find({ user: userId }).sort({ createdAt: -1 });
+    const completedInterviews = allInterviewSessions.filter(s => s.status === 'COMPLETED');
+    const totalInterviews = completedInterviews.length;
+    const hasInterviews = totalInterviews > 0;
 
-    // 4. Chart Data (up to 7 latest completed quizzes, in chronological order)
+    let averageInterviewScore = 0;
+    let highestScore = 0;
+    let latestInterview = null;
+
+    if (hasInterviews) {
+      const scores = completedInterviews.map(s => s.report ? s.report.overallScore : 0);
+      const totalScoreSum = scores.reduce((acc, s) => acc + s, 0);
+      averageInterviewScore = Math.round(totalScoreSum / totalInterviews);
+      highestScore = Math.max(...scores, 0);
+      latestInterview = completedInterviews[0];
+    }
+
+    // 4. Calculate Placement Readiness
+    // Weights: Resume (30%), Aptitude (30%), Mock Interview (40%)
+    let readiness = 0;
+    if (hasResume && hasAttempts && hasInterviews) {
+      readiness = Math.round((averageAccuracy * 0.30) + (latestAtsScore * 0.30) + (averageInterviewScore * 0.40));
+    } else if (hasResume && hasAttempts) {
+      readiness = Math.round((averageAccuracy * 0.40) + (latestAtsScore * 0.60));
+    } else if (hasResume) {
+      readiness = Math.round(latestAtsScore);
+    } else if (hasAttempts) {
+      readiness = Math.round(averageAccuracy);
+    }
+
+    // 5. Chart Data (up to 7 latest completed quizzes, in chronological order)
     const recentAttemptsForChart = [...completedAttempts].slice(0, 7).reverse();
     const chartData = recentAttemptsForChart.map((attempt, index) => ({
       name: `Quiz ${index + 1}`,
       score: attempt.accuracy
     }));
 
-    // 5. Preparation Progress metrics
+    // 6. Preparation Progress metrics
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
@@ -333,7 +362,7 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
-    // 6. Build Resume Analyzer Activities list
+    // 7. Build Resume Analyzer Activities list
     const resumeActivities = [];
     for (let i = 0; i < resumeAnalyses.length; i++) {
       const doc = resumeAnalyses[i];
@@ -382,7 +411,7 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
       }
     }
 
-    // 7. Build Aptitude Activities list
+    // 8. Build Aptitude Activities list
     const aptitudeActivities = [];
     for (const attempt of allAttempts) {
       const timestamp = attempt.submittedAt || attempt.startedAt || attempt.createdAt;
@@ -411,8 +440,31 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
       }
     }
 
+    // 9. Build Mock Interview Activities list
+    const interviewActivities = [];
+    for (const session of allInterviewSessions) {
+      const timestamp = session.completedAt || session.createdAt;
+      if (session.status === 'COMPLETED') {
+        interviewActivities.push({
+          desc: `Completed Mock ${session.interviewType} Interview`,
+          detail: `Score ${session.report ? session.report.overallScore : 0}%`,
+          icon: "MessageSquareCode",
+          color: "text-purple-400 bg-purple-500/10",
+          timestamp
+        });
+      } else if (session.status === 'IN_PROGRESS') {
+        interviewActivities.push({
+          desc: `Started Mock ${session.interviewType} Interview`,
+          detail: `${session.role} at ${session.company}`,
+          icon: "MessageSquareCode",
+          color: "text-purple-400 bg-purple-500/10",
+          timestamp
+        });
+      }
+    }
+
     // Merge and sort all activities chronologically, format relative times
-    const combinedActivities = [...resumeActivities, ...aptitudeActivities]
+    const combinedActivities = [...resumeActivities, ...aptitudeActivities, ...interviewActivities]
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .map(act => ({
         desc: act.desc,
@@ -444,6 +496,21 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
           week: completedQuizzesThisWeek,
           month: completedQuizzesThisMonth
         }
+      },
+      interviewSummary: {
+        hasInterviews,
+        totalInterviews,
+        averageScore: averageInterviewScore,
+        highestScore,
+        latestInterview: latestInterview ? {
+          id: latestInterview._id,
+          company: latestInterview.company,
+          role: latestInterview.role,
+          score: latestInterview.report ? latestInterview.report.overallScore : 0,
+          date: latestInterview.completedAt ? new Date(latestInterview.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "",
+          category: latestInterview.interviewType,
+          communicationScore: latestInterview.report ? latestInterview.report.communicationScore : 0
+        } : null
       },
       readiness,
       activities: combinedActivities.slice(0, 10)
