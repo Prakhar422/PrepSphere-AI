@@ -410,10 +410,10 @@ const AptitudePractice = () => {
       path: "/mock-interview",
     },
     {
-      name: "Coding Tracker",
+      name: "Coding Journey",
       icon: Code2,
       active: false,
-      path: "/coding-tracker",
+      path: "/coding-journey",
     },
     {
       name: "Interview Experiences",

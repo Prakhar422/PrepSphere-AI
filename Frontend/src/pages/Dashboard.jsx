@@ -214,7 +214,7 @@ const Dashboard = () => {
     { name: "Aptitude Practice", icon: Brain, active: false, path: "/aptitude-practice" },
     { name: "Resume Analyzer", icon: FileSearch, active: false, path: "/resume-analyzer" },
     { name: "Mock Interview", icon: MessageSquareCode, active: false, path: "/mock-interview" },
-    { name: "Coding Tracker", icon: Code2, active: false, path: "/coding-tracker" },
+    { name: "Coding Journey", icon: Code2, active: false, path: "/coding-journey" },
     { name: "Interview Experiences", icon: BookOpen, active: false, path: "/interview-experiences" },
     { name: "Career Analytics", icon: LineChart, active: false, path: "/career-analytics" },
     { name: "Settings", icon: SettingsIcon, active: false, path: "/settings" },

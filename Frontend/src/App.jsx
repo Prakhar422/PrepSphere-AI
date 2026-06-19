@@ -10,6 +10,7 @@ import AptitudePractice from "./pages/AptitudePractice";
 import QuizHistory from "./pages/QuizHistory";
 import QuizReport from "./pages/QuizReport";
 import MockInterview from "./pages/MockInterview";
+import CodingJourney from "./pages/CodingJourney";
 import OAuthSuccess from "./pages/OAuthSuccess";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -84,6 +85,22 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <MockInterview />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/coding-journey"
+            element={
+              <ProtectedRoute>
+                <CodingJourney />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/coding-tracker"
+            element={
+              <ProtectedRoute>
+                <CodingJourney />
               </ProtectedRoute>
             }
           />
