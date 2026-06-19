@@ -45,3 +45,15 @@ export const getInterviewReport = async (interviewId) => {
   const response = await api.get(`/interview/${interviewId}/report`);
   return response.data;
 };
+
+/**
+ * Deletes a specific interview session and report.
+ * 
+ * @param {string} interviewId - The MongoDB ObjectId of the interview session to delete
+ * @returns {Promise<Object>} The server response containing deletion status
+ */
+export const deleteInterview = async (interviewId) => {
+  const response = await api.delete(`/interview/${interviewId}`);
+  return response.data;
+};
+

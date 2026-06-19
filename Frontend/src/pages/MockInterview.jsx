@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
+import { jsPDF } from "jspdf";
 import {
   startInterview as apiStartInterview,
   submitAnswer as apiSubmitAnswer,
   getInterviewHistory as apiGetInterviewHistory,
-  getInterviewReport as apiGetInterviewReport
+  getInterviewReport as apiGetInterviewReport,
+  deleteInterview as apiDeleteInterview
 } from "../services/interviewService";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -45,12 +47,13 @@ import {
   Clock,
   Briefcase,
   Upload,
-  Mic,
-  MicOff,
   Send,
   Plus,
   Info,
   RefreshCw,
+  Trophy,
+  MessageSquare,
+  Activity,
   Star,
   Trash2,
   AlertCircle,
@@ -140,17 +143,16 @@ const initialHistoryRecords = [
       confidence: 85,
       communication: 90,
       technicalAccuracy: 88,
-      responseTime: 80,
       professionalism: 92,
-      eyeContact: 85
+      problemSolving: 85
     },
     radarData: [
       { subject: "Confidence", value: 85 },
       { subject: "Communication", value: 90 },
       { subject: "Technical Accuracy", value: 88 },
-      { subject: "Response Time", value: 80 },
+      { subject: "Problem Solving", value: 85 },
       { subject: "Professionalism", value: 92 },
-      { subject: "Eye Contact", value: 85 }
+      { subject: "Critical Thinking", value: 80 }
     ],
     strengths: [
       "Demonstrated strong problem-solving patterns during technical design.",
@@ -194,17 +196,16 @@ const initialHistoryRecords = [
       confidence: 72,
       communication: 80,
       technicalAccuracy: 70,
-      responseTime: 75,
       professionalism: 85,
-      eyeContact: 78
+      problemSolving: 75
     },
     radarData: [
       { subject: "Confidence", value: 72 },
       { subject: "Communication", value: 80 },
       { subject: "Technical Accuracy", value: 70 },
-      { subject: "Response Time", value: 75 },
+      { subject: "Problem Solving", value: 75 },
       { subject: "Professionalism", value: 85 },
-      { subject: "Eye Contact", value: 78 }
+      { subject: "Critical Thinking", value: 78 }
     ],
     strengths: [
       "Polite communication style.",
@@ -267,6 +268,160 @@ const AI_QUESTION_PRESETS = {
   ]
 };
 
+// Helper to determine adaptive metrics by interview type
+const getAdaptiveMetrics = (report) => {
+  if (!report) return { radarData: [], overviewCards: [] };
+  
+  const category = (report.interviewType || report.category || "Technical").toLowerCase();
+  const score = report.overallScore ?? report.score ?? 70;
+  
+  const getVal = (field, offset = 0) => {
+    if (report.metrics && report.metrics[field] !== undefined) {
+      return report.metrics[field];
+    }
+    if (report[field + "Score"] !== undefined) {
+      return report[field + "Score"];
+    }
+    if (report[field] !== undefined && typeof report[field] === 'number') {
+      return report[field];
+    }
+    return Math.round(Math.max(50, Math.min(100, score + offset)));
+  };
+
+  if (category.includes("tech") || category.includes("system")) {
+    const technicalKnowledge = getVal("technicalAccuracy", 2);
+    const problemSolving = getVal("problemSolving", 4);
+    const communication = getVal("communication", -2);
+    const confidence = getVal("confidence", 3);
+    const professionalism = getVal("professionalism", 5);
+    const criticalThinking = getVal("criticalThinking", 1);
+
+    return {
+      radarData: [
+        { subject: "Technical Knowledge", value: technicalKnowledge },
+        { subject: "Problem Solving", value: problemSolving },
+        { subject: "Communication", value: communication },
+        { subject: "Confidence", value: confidence },
+        { subject: "Professionalism", value: professionalism },
+        { subject: "Critical Thinking", value: criticalThinking }
+      ],
+      overviewCards: [
+        { label: "Overall Score", val: `${score}%`, col: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25" },
+        { label: "Technical Knowledge", val: `${technicalKnowledge}%`, col: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
+        { label: "Problem Solving", val: `${problemSolving}%`, col: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+        { label: "Communication", val: `${communication}%`, col: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+        { label: "Confidence", val: `${confidence}%`, col: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
+        { label: "Professionalism", val: `${professionalism}%`, col: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" }
+      ]
+    };
+  } else if (category.includes("hr") || category.includes("behavioral")) {
+    const communication = getVal("communication", 5);
+    const professionalism = getVal("professionalism", 8);
+    const behavioralResponses = getVal("behavioralResponses", 2);
+    const leadership = getVal("leadership", -1);
+    const companyAlignment = getVal("companyAlignment", 4);
+    const confidence = getVal("confidence", 3);
+
+    return {
+      radarData: [
+        { subject: "Communication", value: communication },
+        { subject: "Professionalism", value: professionalism },
+        { subject: "Behavioral Responses", value: behavioralResponses },
+        { subject: "Leadership", value: leadership },
+        { subject: "Company Alignment", value: companyAlignment },
+        { subject: "Confidence", value: confidence }
+      ],
+      overviewCards: [
+        { label: "Overall Score", val: `${score}%`, col: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25" },
+        { label: "Communication", val: `${communication}%`, col: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+        { label: "Professionalism", val: `${professionalism}%`, col: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" },
+        { label: "Behavioral Responses", val: `${behavioralResponses}%`, col: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
+        { label: "Leadership", val: `${leadership}%`, col: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+        { label: "Company Alignment", val: `${companyAlignment}%`, col: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20" },
+        { label: "Confidence", val: `${confidence}%`, col: "text-pink-400 bg-pink-500/10 border-pink-500/20" }
+      ]
+    };
+  } else if (category.includes("market")) {
+    const communication = getVal("communication", 4);
+    const creativity = getVal("creativity", 6);
+    const businessUnderstanding = getVal("businessUnderstanding", 1);
+    const customerThinking = getVal("customerThinking", 3);
+    const professionalism = getVal("professionalism", 2);
+    const criticalThinking = getVal("criticalThinking", 5);
+
+    return {
+      radarData: [
+        { subject: "Communication", value: communication },
+        { subject: "Creativity", value: creativity },
+        { subject: "Business Understanding", value: businessUnderstanding },
+        { subject: "Customer Thinking", value: customerThinking },
+        { subject: "Professionalism", value: professionalism },
+        { subject: "Critical Thinking", value: criticalThinking }
+      ],
+      overviewCards: [
+        { label: "Overall Score", val: `${score}%`, col: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25" },
+        { label: "Communication", val: `${communication}%`, col: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+        { label: "Creativity", val: `${creativity}%`, col: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
+        { label: "Business Understanding", val: `${businessUnderstanding}%`, col: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+        { label: "Customer Thinking", val: `${customerThinking}%`, col: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
+        { label: "Professionalism", val: `${professionalism}%`, col: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" }
+      ]
+    };
+  } else if (category.includes("finance")) {
+    const analyticalThinking = getVal("analyticalThinking", 5);
+    const domainKnowledge = getVal("technicalAccuracy", 2);
+    const problemSolving = getVal("problemSolving", 4);
+    const communication = getVal("communication", -2);
+    const professionalism = getVal("professionalism", 6);
+    const criticalThinking = getVal("criticalThinking", 3);
+
+    return {
+      radarData: [
+        { subject: "Analytical Thinking", value: analyticalThinking },
+        { subject: "Domain Knowledge", value: domainKnowledge },
+        { subject: "Problem Solving", value: problemSolving },
+        { subject: "Communication", value: communication },
+        { subject: "Professionalism", value: professionalism },
+        { subject: "Critical Thinking", value: criticalThinking }
+      ],
+      overviewCards: [
+        { label: "Overall Score", val: `${score}%`, col: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25" },
+        { label: "Analytical Thinking", val: `${analyticalThinking}%`, col: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+        { label: "Domain Knowledge", val: `${domainKnowledge}%`, col: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
+        { label: "Problem Solving", val: `${problemSolving}%`, col: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
+        { label: "Communication", val: `${communication}%`, col: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+        { label: "Professionalism", val: `${professionalism}%`, col: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" }
+      ]
+    };
+  } else {
+    const communication = getVal("communication", 2);
+    const professionalism = getVal("professionalism", 5);
+    const problemSolving = getVal("problemSolving", 4);
+    const domainKnowledge = getVal("technicalAccuracy", 1);
+    const confidence = getVal("confidence", 3);
+    const criticalThinking = getVal("criticalThinking", 2);
+
+    return {
+      radarData: [
+        { subject: "Communication", value: communication },
+        { subject: "Professionalism", value: professionalism },
+        { subject: "Problem Solving", value: problemSolving },
+        { subject: "Domain Knowledge", value: domainKnowledge },
+        { subject: "Confidence", value: confidence },
+        { subject: "Critical Thinking", value: criticalThinking }
+      ],
+      overviewCards: [
+        { label: "Overall Score", val: `${score}%`, col: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25" },
+        { label: "Communication", val: `${communication}%`, col: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+        { label: "Professionalism", val: `${professionalism}%`, col: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" },
+        { label: "Problem Solving", val: `${problemSolving}%`, col: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+        { label: "Domain Knowledge", val: `${domainKnowledge}%`, col: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
+        { label: "Confidence", val: `${confidence}%`, col: "text-pink-400 bg-pink-500/10 border-pink-500/20" }
+      ]
+    };
+  }
+};
+
 const MockInterview = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -290,6 +445,15 @@ const MockInterview = () => {
   const [historyTotalPages, setHistoryTotalPages] = useState(1);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadMessage, setDownloadMessage] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  
+  // Delete states
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [successToast, setSuccessToast] = useState("");
+  const [practiceStreak, setPracticeStreak] = useState(0);
 
   // Setup/Configuration State
   const [config, setConfig] = useState({
@@ -337,6 +501,9 @@ const MockInterview = () => {
         setHistoryList(data.history || []);
         setHistoryPage(data.pagination?.page || 1);
         setHistoryTotalPages(data.pagination?.pages || 1);
+        if (data.interviewPracticeStreak !== undefined) {
+          setPracticeStreak(data.interviewPracticeStreak);
+        }
       }
     } catch (err) {
       console.error("Error fetching history:", err);
@@ -361,7 +528,7 @@ const MockInterview = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+
 
   // Live Interview States
   const [activeInterview, setActiveInterview] = useState(null);
@@ -382,20 +549,31 @@ const MockInterview = () => {
     confidence: 70,
     communication: 75,
     technicalAccuracy: 60,
-    responseTime: 80,
     professionalism: 85,
-    eyeContact: 90
+    problemSolving: 75
   });
 
-  const [liveSuggestions, setLiveSuggestions] = useState([
-    { type: "strength", text: "Clear voice volume and neutral speech speed." },
-    { type: "weakness", text: "Minimal structural pauses before responding." },
-    { type: "suggestion", text: "Try to structure your answer using the STAR framework." }
-  ]);
+  const [liveSuggestions, setLiveSuggestions] = useState([]);
 
   const timerRef = useRef(null);
   const chatBottomRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  const mainScrollContainerRef = useRef(null);
 
+  // Automatically scroll container to top when currentView changes
+  useEffect(() => {
+    if (mainScrollContainerRef.current) {
+      mainScrollContainerRef.current.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    }
+    // Also scroll the browser window itself as a fallback
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  }, [currentView]);
   // Standard Sidebar links
   const navItems = [
     { name: "Dashboard", icon: LayoutDashboard, active: false, path: "/dashboard" },
@@ -415,10 +593,13 @@ const MockInterview = () => {
     return `${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
   };
 
-  // Scroll chat to bottom
+  // Scroll chat container directly to prevent scrolling the browser window
   useEffect(() => {
-    if (chatBottomRef.current) {
-      chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth"
+      });
     }
   }, [chatMessages, isTyping]);
 
@@ -477,13 +658,10 @@ const MockInterview = () => {
           confidence: 75,
           communication: 78,
           technicalAccuracy: 65,
-          responseTime: 80,
           professionalism: 85,
-          eyeContact: 90
+          problemSolving: 75
         });
-        setLiveSuggestions([
-          { type: "suggestion", text: "Speak clearly and state key conceptual frameworks first." }
-        ]);
+        setLiveSuggestions([]);
 
         setActiveInterview({
           _id: data.interviewId,
@@ -602,6 +780,7 @@ const MockInterview = () => {
           confidence: Math.round(Math.max(50, Math.min(100, 60 + (res.evaluation.score * 3.5) + Math.random() * 8))),
           communication: Math.round(Math.max(50, Math.min(100, 55 + (res.evaluation.score * 4.5) + Math.random() * 6))),
           professionalism: Math.round(Math.max(50, Math.min(100, 65 + (res.evaluation.score * 3) + Math.random() * 5))),
+          problemSolving: Math.round(Math.max(50, Math.min(100, 58 + (res.evaluation.score * 4) + Math.random() * 7)))
         }));
 
         // Render coach dynamic pointers
@@ -720,8 +899,451 @@ const MockInterview = () => {
   };
 
   const handleDeleteHistory = (id, e) => {
-    e.stopPropagation();
-    setHistoryList((prev) => prev.filter((item) => item.id !== id));
+    if (e) e.stopPropagation();
+    setDeleteTarget(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    setSuccessToast("");
+    try {
+      const response = await apiDeleteInterview(deleteTarget);
+      if (response && response.success) {
+        // Remove the report from Interview History immediately
+        setHistoryList((prev) => prev.filter((item) => item.id !== deleteTarget));
+        
+        // Refetch history and streak from backend to keep everything synchronized
+        fetchHistory(historyPage);
+        
+        // Show success toast
+        setSuccessToast("Interview report deleted successfully.");
+        
+        // Clear delete target and state
+        setDeleteTarget(null);
+
+        // Hide success toast after 4 seconds
+        setTimeout(() => {
+          setSuccessToast("");
+        }, 4000);
+      } else {
+        alert(response?.message || "Failed to delete interview report.");
+      }
+    } catch (err) {
+      console.error("Error deleting interview report:", err);
+      alert(err.response?.data?.message || "Failed to delete interview report. Please check your network connection.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (!activeReport) {
+      setDownloadError("No interview report data available.");
+      return;
+    }
+    
+    setIsDownloading(true);
+    setDownloadMessage("");
+    setDownloadError("");
+    
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "pt",
+        format: "a4"
+      });
+      
+      let currentY = 50;
+      
+      const checkPage = (neededSpace) => {
+        if (currentY + neededSpace > 780) {
+          doc.addPage();
+          currentY = 50;
+        }
+      };
+      
+      // Page Top Accent Line
+      doc.setDrawColor(99, 102, 241); // indigo-500
+      doc.setLineWidth(3);
+      doc.line(40, 45, 555, 45);
+      
+      // Header branding
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(99, 102, 241);
+      doc.text("PREPSPHERE AI", 40, 60);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text("AI Mock Interview Report", 40, 85);
+      
+      // Metadata completion date and candidate
+      const dateStr = activeReport.completedAt 
+        ? new Date(activeReport.completedAt).toLocaleDateString("en-US", { 
+            month: "long", 
+            day: "numeric", 
+            year: "numeric", 
+            hour: "2-digit", 
+            minute: "2-digit" 
+          }) 
+        : new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+        
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text(`Completion Date: ${dateStr}`, 40, 102);
+      
+      const candidateName = user?.name || user?.username || "Candidate";
+      doc.text(`Candidate Name: ${candidateName}`, 40, 114);
+      
+      currentY = 135;
+      
+      // Interview Details Panel Box
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(1);
+      doc.rect(40, currentY, 515, 105, "FD");
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("INTERVIEW DETAILS", 50, currentY + 18);
+      
+      let detailsY = currentY + 36;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 116, 139); // slate-500
+      
+      doc.text("Interview Type:", 50, detailsY);
+      doc.text("Target Company:", 50, detailsY + 15);
+      doc.text("Target Role:", 50, detailsY + 30);
+      doc.text("Difficulty:", 50, detailsY + 45);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(String(activeReport.interviewType || activeReport.category || config.category || "Technical"), 150, detailsY);
+      doc.text(String(activeReport.company || config.company || "N/A"), 150, detailsY + 15);
+      doc.text(String(activeReport.role || config.jobRole || "N/A"), 150, detailsY + 30);
+      doc.text(String(activeReport.difficulty || config.difficulty || "Medium"), 150, detailsY + 45);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text("Duration Limit:", 300, detailsY);
+      doc.text("Language:", 300, detailsY + 15);
+      doc.text("Resume Personalization:", 300, detailsY + 30);
+      doc.text("Status:", 300, detailsY + 45);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${activeReport.duration || config.duration || 30} Minutes`, 430, detailsY);
+      doc.text(String(activeReport.language || config.language || "English"), 430, detailsY + 15);
+      doc.text(activeReport.resumeEnabled ? "Enabled" : "Disabled", 430, detailsY + 30);
+      doc.setTextColor(22, 163, 74); // green-600
+      doc.text("Completed", 430, detailsY + 45);
+      
+      currentY = currentY + 105 + 25;
+      
+      // Overall Performance & Skill Assessment side-by-side
+      checkPage(140);
+      
+      // Left Col: Overall Performance Card
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(40, currentY, 240, 130, "FD");
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text("OVERALL PERFORMANCE", 50, currentY + 18);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(28);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      const scoreVal = activeReport.overallScore ?? activeReport.score ?? 0;
+      doc.text(`${scoreVal}%`, 50, currentY + 52);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      const readiness = activeReport.readinessLevel || activeReport.recommendation || "Developing";
+      doc.text(readiness, 50, currentY + 74);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Questions Attempted: ${activeReport.totalQuestions || 15}`, 50, currentY + 92);
+      doc.text(`Questions Answered: ${activeReport.answeredQuestions || activeReport.totalQuestions || 15}`, 50, currentY + 104);
+      doc.text(`Completion Rate: 100%`, 50, currentY + 116);
+      
+      // Right Col: Skill Assessment using progress bars
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text("SKILL ASSESSMENT", 315, currentY + 12);
+      
+      const { radarData } = getAdaptiveMetrics(activeReport);
+      let barY = currentY + 28;
+      
+      radarData.forEach((metric) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+        doc.text(metric.subject, 315, barY);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text(`${metric.value}%`, 555, barY, { align: "right" });
+        
+        // Draw progress bar bg
+        doc.setFillColor(241, 245, 249);
+        doc.rect(315, barY + 4, 240, 6, "F");
+        
+        // Progress fill
+        doc.setFillColor(99, 102, 241);
+        const fillWidth = (metric.value / 100) * 240;
+        doc.rect(315, barY + 4, fillWidth, 6, "F");
+        
+        barY += 19;
+      });
+      
+      currentY = currentY + 130 + 25;
+      
+      // Strengths Identified
+      checkPage(70);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(22, 163, 74); // green-600
+      doc.text("AI Strengths Identified", 40, currentY);
+      currentY += 15;
+      
+      const strengths = activeReport.strengths || [];
+      if (strengths.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("- No strengths documented.", 50, currentY);
+        currentY += 15;
+      } else {
+        strengths.forEach((str) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(51, 65, 85);
+          const lines = doc.splitTextToSize(`• ${str}`, 505);
+          checkPage(lines.length * 13 + 5);
+          doc.text(lines, 40, currentY);
+          currentY += lines.length * 13 + 3;
+        });
+      }
+      currentY += 12;
+      
+      // Areas for Improvement
+      checkPage(70);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(220, 38, 38); // red-600
+      doc.text("Areas for Improvement", 40, currentY);
+      currentY += 15;
+      
+      const weaknesses = activeReport.weaknesses || [];
+      if (weaknesses.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("- No improvement areas documented.", 50, currentY);
+        currentY += 15;
+      } else {
+        weaknesses.forEach((weak) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(51, 65, 85);
+          const lines = doc.splitTextToSize(`• ${weak}`, 505);
+          checkPage(lines.length * 13 + 5);
+          doc.text(lines, 40, currentY);
+          currentY += lines.length * 13 + 3;
+        });
+      }
+      currentY += 12;
+      
+      // Recommendations
+      checkPage(70);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.text("AI Recommendations & Next Steps", 40, currentY);
+      currentY += 15;
+      
+      const recs = activeReport.recommendations || [];
+      if (recs.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("- No specific recommendations documented.", 50, currentY);
+        currentY += 15;
+      } else {
+        recs.forEach((rec, idx) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(51, 65, 85);
+          const lines = doc.splitTextToSize(`${idx + 1}. ${rec}`, 505);
+          checkPage(lines.length * 13 + 5);
+          doc.text(lines, 40, currentY);
+          currentY += lines.length * 13 + 3;
+        });
+      }
+      currentY += 18;
+      
+      // Question-by-Question Review Table
+      checkPage(80);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text("Question-by-Question Review Summary", 40, currentY);
+      currentY += 15;
+      
+      // Draw Table Header
+      doc.setFillColor(79, 70, 229);
+      doc.rect(40, currentY, 515, 20, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text("Q#", 43, currentY + 13);
+      doc.text("Question", 68, currentY + 13);
+      doc.text("Candidate Answer", 243, currentY + 13);
+      doc.text("Score", 463, currentY + 13);
+      doc.text("Status", 508, currentY + 13);
+      currentY += 20;
+      
+      const questionsReviewed = activeReport.questionsReviewed || [];
+      questionsReviewed.forEach((q, idx) => {
+        const qLines = doc.splitTextToSize(q.question || "", 170);
+        const aLines = doc.splitTextToSize(q.answer || "", 215);
+        const textHeight = Math.max(qLines.length, aLines.length) * 11;
+        const rowHeight = Math.max(22, textHeight + 10);
+        
+        if (currentY + rowHeight > 780) {
+          doc.setDrawColor(226, 232, 240);
+          doc.line(40, currentY, 555, currentY);
+          
+          doc.addPage();
+          currentY = 50;
+          
+          // Re-draw Table Header
+          doc.setFillColor(79, 70, 229);
+          doc.rect(40, currentY, 515, 20, "F");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8.5);
+          doc.setTextColor(255, 255, 255);
+          doc.text("Q#", 43, currentY + 13);
+          doc.text("Question", 68, currentY + 13);
+          doc.text("Candidate Answer", 243, currentY + 13);
+          doc.text("Score", 463, currentY + 13);
+          doc.text("Status", 508, currentY + 13);
+          currentY += 20;
+        }
+        
+        // Alternating row colors
+        if (idx % 2 === 0) {
+          doc.setFillColor(255, 255, 255);
+        } else {
+          doc.setFillColor(248, 250, 252);
+        }
+        doc.rect(40, currentY, 515, rowHeight, "F");
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(51, 65, 85);
+        
+        // Q#
+        doc.setFont("helvetica", "bold");
+        doc.text(`Q${idx + 1}`, 43, currentY + 14);
+        doc.setFont("helvetica", "normal");
+        
+        // Question
+        doc.text(qLines, 68, currentY + 14);
+        
+        // Candidate Answer
+        doc.text(aLines, 243, currentY + 14);
+        
+        // Score
+        const percentScore = q.score || 0;
+        doc.setFont("helvetica", "bold");
+        doc.text(`${percentScore}%`, 463, currentY + 14);
+        doc.setFont("helvetica", "normal");
+        
+        // Status
+        const statusText = percentScore >= 80 ? "Pass" : percentScore >= 60 ? "Developing" : "Needs work";
+        const statusColor = percentScore >= 80 ? [22, 163, 74] : percentScore >= 60 ? [217, 119, 6] : [220, 38, 38];
+        doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+        doc.setFont("helvetica", "bold");
+        doc.text(statusText, 508, currentY + 14);
+        
+        // Separator line
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.5);
+        doc.line(40, currentY + rowHeight, 555, currentY + rowHeight);
+        
+        currentY += rowHeight;
+      });
+      currentY += 18;
+      
+      // Concluding AI Summary
+      checkPage(80);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.text("AI Summary & Concluding Feedback", 40, currentY);
+      currentY += 15;
+      
+      const conclusionText = activeReport.overallFeedback || activeReport.interviewSummary || "Mock interview evaluation successfully compiled.";
+      const conclusionLines = doc.splitTextToSize(conclusionText, 505);
+      checkPage(conclusionLines.length * 13 + 5);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+      doc.text(conclusionLines, 40, currentY);
+      
+      // running Headers & Footers
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        
+        // Running Header
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184); // slate-400
+        doc.text("PrepSphere AI – Mock Interview Report", 40, 25);
+        
+        // Running Footer
+        doc.text(`Page ${i} of ${totalPages}`, 555, 820, { align: "right" });
+        doc.text("Confidential – Prepared by PrepSphere AI Engine", 40, 820);
+        
+        // Header & Footer lines
+        doc.setDrawColor(241, 245, 249);
+        doc.setLineWidth(0.5);
+        doc.line(40, 30, 555, 30);
+        doc.line(40, 810, 555, 810);
+      }
+      
+      // File Name Formatting
+      const categorySanitized = (activeReport.interviewType || activeReport.category || config.category || "Interview").trim().replace(/[^a-zA-Z0-9]/g, "_");
+      const dateObj = activeReport.completedAt ? new Date(activeReport.completedAt) : new Date();
+      const yyyy = dateObj.getFullYear();
+      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(dateObj.getDate()).padStart(2, '0');
+      const formattedDate = `${yyyy}-${mm}-${dd}`;
+      const filename = `PrepSphere_Interview_Report_${categorySanitized}_${formattedDate}.pdf`;
+      
+      doc.save(filename);
+      setDownloadMessage("Report downloaded successfully.");
+      setTimeout(() => setDownloadMessage(""), 4000);
+    } catch (error) {
+      console.error("PDF generation failure:", error);
+      setDownloadError(error.message || "Failed to generate report PDF.");
+      setTimeout(() => setDownloadError(""), 4000);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   // Filter history records
@@ -733,6 +1355,19 @@ const MockInterview = () => {
       item.category.toLowerCase().includes(query)
     );
   });
+
+  const completedInterviews = historyList.filter(
+    (item) => item.status === "Completed" || item.status === "Needs Practice"
+  );
+  const totalCompleted = completedInterviews.length;
+  const averageScore = totalCompleted > 0
+    ? Math.round(completedInterviews.reduce((acc, i) => acc + i.score, 0) / totalCompleted)
+    : 0;
+  const bestInterview = totalCompleted > 0
+    ? completedInterviews.reduce((best, curr) => curr.score > best.score ? curr : best, completedInterviews[0])
+    : null;
+  const bestScore = bestInterview ? bestInterview.score : 0;
+
 
   // Helper to handle duration change and calculate mapped questions
   const handleDurationChange = (val) => {
@@ -951,7 +1586,7 @@ const MockInterview = () => {
         </AnimatePresence>
 
         {/* MAIN DISPLAY CONTAINER */}
-        <div className="lg:ml-[280px] flex-1 flex flex-col h-screen overflow-y-auto z-10 relative">
+        <div ref={mainScrollContainerRef} className="lg:ml-[280px] flex-1 flex flex-col h-screen overflow-y-auto z-10 relative">
           
           {/* TOP NAVBAR */}
           <header className="sticky top-0 z-30 bg-[#050B1F]/70 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between shrink-0">
@@ -999,6 +1634,25 @@ const MockInterview = () => {
 
           {/* MAIN PAGE BODY (COORDINATOR ROUTE STATE) */}
           <main className="flex-1 p-6 space-y-8 max-w-7xl mx-auto w-full">
+            {/* Success Toast Notification */}
+            <AnimatePresence>
+              {successToast && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-4 py-3 rounded-xl flex items-center justify-between text-sm shadow-[0_0_20px_rgba(16,185,129,0.1)] relative z-30"
+                >
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{successToast}</span>
+                  </div>
+                  <button onClick={() => setSuccessToast("")} className="text-emerald-400 hover:text-emerald-300 focus:outline-none">
+                    <X className="w-4 h-4" />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
             
             {/* SKELETON LOADER TRIGGERED DURING PROCESS TRANSITIONS */}
             {isLoading ? (
@@ -1043,7 +1697,7 @@ const MockInterview = () => {
                         <p className="text-sm text-slate-400 mt-1">Practice realistic AI-powered technical and HR interviews to prepare for placements.</p>
                       </div>
                       <div className="flex gap-2.5">
-                        <button
+                        {/* <button
                           onClick={() => setCurrentView("history")}
                           className="px-4 py-2 border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-xs font-bold rounded-xl text-slate-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
                         >
@@ -1056,7 +1710,7 @@ const MockInterview = () => {
                         >
                           <SettingsIcon className="w-4 h-4 text-purple-400" />
                           Settings
-                        </button>
+                        </button> */}
                       </div>
                     </div>
 
@@ -1107,26 +1761,108 @@ const MockInterview = () => {
                     <div>
                       <h3 className="text-lg font-bold text-white mb-4">Quick Performance Overview</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {[
-                          { label: "Total Interviews", val: historyList.length, icon: MessageSquareCode, col: "text-indigo-400 bg-indigo-500/10", border: "hover:border-indigo-500/25" },
-                          { label: "Average Score", val: `${Math.round(historyList.reduce((acc, i) => acc + i.score, 0) / historyList.length || 0)}%`, icon: Award, col: "text-purple-400 bg-purple-500/10", border: "hover:border-purple-500/25" },
-                          { label: "Best Interview", val: `${Math.max(...historyList.map((i) => i.score), 0)}%`, icon: Star, col: "text-pink-400 bg-pink-500/10", border: "hover:border-pink-500/25" },
-                          { label: "Practice Streak", val: "4 Days", icon: Flame, col: "text-orange-400 bg-orange-500/10", border: "hover:border-orange-500/25" }
-                        ].map((stat, idx) => (
-                          <div
-                            key={idx}
-                            className={`bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden transition-all duration-300 ${stat.border}`}
-                          >
-                            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-                            <div className="flex justify-between items-start">
-                              <span className="text-sm font-medium text-slate-400">{stat.label}</span>
-                              <div className={`p-1.5 rounded-lg ${stat.col}`}>
-                                <stat.icon className="w-4 h-4" />
-                              </div>
+                        
+                        {/* Card 1: Average Score */}
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all">
+                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                          <div className="flex justify-between items-start">
+                            <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                              Average Score
+                            </span>
+                            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                              <Trophy className="w-4 h-4" />
                             </div>
-                            <p className="text-2xl font-black text-white mt-4">{stat.val}</p>
                           </div>
-                        ))}
+                          <div className="mt-4 flex items-baseline space-x-1">
+                            <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 font-extrabold">
+                              {completedInterviews.length > 0 ? averageScore : "—"}
+                            </span>
+                            {completedInterviews.length > 0 && (
+                              <span className="text-xs text-slate-400 font-semibold">
+                                %
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 text-xs text-indigo-400 font-semibold flex items-center gap-1">
+                            <Activity className="w-3 h-3" />
+                            <span>
+                              {completedInterviews.length > 0
+                                ? (averageScore >= 80 ? "Excellent Progress" : "Improving Consistently")
+                                : "Take a mock interview"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card 2: Best Interview */}
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 transition-all">
+                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
+                          <div className="flex justify-between items-start">
+                            <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                              Best Interview
+                            </span>
+                            <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                              <AwardIcon className="w-4 h-4" />
+                            </div>
+                          </div>
+                          <div className="mt-4 flex items-baseline space-x-1">
+                            <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 font-extrabold">
+                              {bestInterview ? `${bestScore}%` : "—"}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-xs text-purple-400 font-semibold truncate">
+                            <span>
+                              {bestInterview
+                                ? `${bestInterview.company} (${bestInterview.role})`
+                                : "Practice mock interviews"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card 3: Total Interviews */}
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all">
+                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+                          <div className="flex justify-between items-start">
+                            <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                              Total Interviews
+                            </span>
+                            <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                              <MessageSquare className="w-4 h-4" />
+                            </div>
+                          </div>
+                          <div className="mt-4">
+                            <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 font-extrabold">
+                              {completedInterviews.length}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-xs text-cyan-400 font-semibold">
+                            <span>Completed Interviews</span>
+                          </div>
+                        </div>
+
+                        {/* Card 4: Practice Streak */}
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all">
+                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
+                          <div className="flex justify-between items-start">
+                            <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                              Practice Streak
+                            </span>
+                            <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
+                              <Flame className="w-4 h-4 animate-pulse" />
+                            </div>
+                          </div>
+                          <div className="mt-4">
+                            <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-extrabold">
+                              {practiceStreak} Day{practiceStreak === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-xs text-pink-400 font-semibold">
+                            <span>
+                              {practiceStreak > 0
+                                ? "Keep the momentum going"
+                                : "Complete your first mock interview to start your streak."}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -1855,13 +2591,10 @@ const MockInterview = () => {
                             <Sparkle className="w-5 h-5" />
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-white text-sm sm:text-base">{config.category} Interview</h3>
-                              <span className="text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-md">
-                                {config.company}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-400 mt-0.5 font-light">{config.jobRole} | {config.difficulty}</p>
+                            <h3 className="font-bold text-white text-sm sm:text-base">{config.category} Interview</h3>
+                            <p className="text-xs text-slate-400 mt-1 font-light">
+                              {config.company} • {config.jobRole} • Question {progress.currentQuestionNumber} of {progress.totalQuestions}
+                            </p>
                           </div>
                         </div>
 
@@ -1891,20 +2624,15 @@ const MockInterview = () => {
                       </div>
 
                       {/* Question Progress bar */}
-                      <div className="bg-slate-950/20 border-b border-white/5 px-5 py-2.5 flex items-center justify-between shrink-0">
-                        <span className="text-xs text-slate-400">
-                          Question <span className="font-bold text-white">{progress.currentQuestionNumber}</span> of <span className="font-bold text-slate-300">{progress.totalQuestions}</span>
-                        </span>
-                        <div className="w-48 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5 ml-4">
-                          <div 
-                            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300"
-                            style={{ width: `${progress.progressPercentage}%` }}
-                          />
-                        </div>
+                      <div className="w-full bg-slate-900 h-[2px] relative shrink-0">
+                        <div 
+                          className="h-full bg-indigo-500 transition-all duration-300"
+                          style={{ width: `${progress.progressPercentage}%` }}
+                        />
                       </div>
 
                       {/* Chat Messages Log view */}
-                      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-950/10">
+                      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-950/10">
                         {chatMessages.map((msg, idx) => (
                           <div
                             key={idx}
@@ -1978,23 +2706,8 @@ const MockInterview = () => {
                             e.preventDefault();
                             handleSendResponse();
                           }}
-                          className="flex items-center gap-3.5"
+                          className="flex items-center gap-3.5 flex-1"
                         >
-                          {/* Microphone simulator button */}
-                          <button
-                            type="button"
-                            onClick={() => setIsMuted(!isMuted)}
-                            className={`p-3 rounded-xl border transition-all cursor-pointer focus:outline-none ${
-                              isMuted 
-                                ? "bg-red-500/10 border-red-500/20 text-red-400" 
-                                : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white hover:border-white/20"
-                            }`}
-                            title={isMuted ? "Unmute Mic" : "Mute Mic"}
-                          >
-                            {isMuted ? <MicOff className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
-                          </button>
-
-                          {/* Chat Input text */}
                           <input
                             type="text"
                             placeholder={isPaused ? "Interview is paused..." : "Type your answer and explanation here..."}
@@ -2020,10 +2733,10 @@ const MockInterview = () => {
                     </div>
 
                     {/* RIGHT PANEL (4 columns): Performance stats gauges and prompts */}
-                    <div className="lg:col-span-4 space-y-6 flex flex-col">
+                    <div className="lg:col-span-4 space-y-4 flex flex-col h-[70vh] min-h-[500px] overflow-y-auto pr-1">
                       
                       {/* Metric Card 1: Live performance trackers (circular meters) */}
-                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-5 relative overflow-hidden shadow-lg flex-1">
+                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-5 relative overflow-hidden shadow-lg shrink-0">
                         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
                           <LineChart className="w-4 h-4 text-indigo-400" />
@@ -2032,12 +2745,11 @@ const MockInterview = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                           {[
-                            { label: "Confidence", val: liveMetrics.confidence, col: "text-blue-500" },
+                            { label: "Overall Score", val: liveMetrics.confidence, col: "text-blue-500" },
                             { label: "Communication", val: liveMetrics.communication, col: "text-emerald-500" },
-                            { label: "Tech Accuracy", val: liveMetrics.technicalAccuracy, col: "text-purple-500" },
-                            { label: "Response Latency", val: liveMetrics.responseTime, col: "text-pink-500" },
-                            { label: "Professionalism", val: liveMetrics.professionalism, col: "text-indigo-500" },
-                            { label: "Eye Contact", val: liveMetrics.eyeContact, col: "text-cyan-500" }
+                            { label: "Domain Knowledge", val: liveMetrics.technicalAccuracy, col: "text-purple-500" },
+                            { label: "Problem Solving", val: liveMetrics.problemSolving, col: "text-pink-500" },
+                            { label: "Professionalism", val: liveMetrics.professionalism, col: "text-indigo-500" }
                           ].map((metric, idx) => (
                             <div key={idx} className="flex flex-col items-center justify-center p-3.5 bg-slate-950/20 border border-white/5 rounded-2xl text-center">
                               {/* Circle SVG */}
@@ -2055,7 +2767,7 @@ const MockInterview = () => {
                       </div>
 
                       {/* Metric Card 2: AI Live Feedback Suggestions */}
-                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-5 relative overflow-hidden shadow-lg flex-1">
+                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-5 relative overflow-hidden shadow-lg shrink-0">
                         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
                           <Sparkles className="w-4 h-4 text-purple-400" />
@@ -2063,25 +2775,44 @@ const MockInterview = () => {
                         </h4>
 
                         <div className="space-y-2.5 overflow-y-auto max-h-[180px] pr-1">
-                          {liveSuggestions.map((sug, idx) => (
-                            <div
-                              key={idx}
-                              className={`p-3 rounded-xl border text-xs leading-normal text-left ${
-                                sug.type === "strength" 
-                                  ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-400" 
-                                  : sug.type === "weakness" 
-                                  ? "bg-red-500/5 border-red-500/10 text-red-400" 
-                                  : "bg-indigo-500/5 border-indigo-500/10 text-indigo-300"
-                              }`}
-                            >
-                              <div className="flex gap-2 items-start">
-                                <span className="font-extrabold uppercase text-[9px] tracking-wide mt-0.5 block">
-                                  {sug.type}:
-                                </span>
-                                <span className="font-light">{sug.text}</span>
-                              </div>
+                          {isTyping ? (
+                            <div className="flex flex-col items-center justify-center py-6 gap-2 text-center">
+                              <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin" />
+                              <span className="text-[11px] text-slate-400 font-light animate-pulse">AI Coach is analyzing your response...</span>
                             </div>
-                          ))}
+                          ) : apiError ? (
+                            <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-xs text-red-400 text-center font-light">
+                              Unable to generate coaching feedback.
+                            </div>
+                          ) : evaluations.length === 0 ? (
+                            <div className="text-center py-6 text-xs text-slate-500 font-light leading-normal">
+                              Answer your first question to receive personalized AI coaching.
+                            </div>
+                          ) : liveSuggestions.length === 0 ? (
+                            <div className="text-center py-6 text-xs text-slate-500 font-light leading-normal">
+                              No feedback available yet.
+                            </div>
+                          ) : (
+                            liveSuggestions.map((sug, idx) => (
+                              <div
+                                key={idx}
+                                className={`p-3 rounded-xl border text-xs leading-normal text-left ${
+                                  sug.type === "strength" 
+                                    ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-400" 
+                                    : sug.type === "weakness" 
+                                    ? "bg-red-500/5 border-red-500/10 text-red-400" 
+                                    : "bg-indigo-500/5 border-indigo-500/10 text-indigo-300"
+                                }`}
+                              >
+                                <div className="flex gap-2 items-start">
+                                  <span className="font-extrabold uppercase text-[9px] tracking-wide mt-0.5 block">
+                                    {sug.type}:
+                                  </span>
+                                  <span className="font-light">{sug.text}</span>
+                                </div>
+                              </div>
+                            ))
+                          )}
                         </div>
                       </div>
 
@@ -2101,7 +2832,7 @@ const MockInterview = () => {
                         </div>
                         <div className="flex justify-between">
                           <span>Status:</span>
-                          <span className="font-bold text-emerald-400 animate-pulse">Live Recording...</span>
+                          <span className="font-bold text-emerald-400 animate-pulse">Interview in Progress...</span>
                         </div>
                       </div>
 
@@ -2131,6 +2862,16 @@ const MockInterview = () => {
                       <div className="space-y-2">
                         <h1 className="text-2xl font-black text-white">Interview Completed</h1>
                         <p className="text-sm text-slate-400 font-light">Great work! Your AI interview has been analyzed and processed successfully.</p>
+                        {downloadMessage && (
+                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl font-medium">
+                            {downloadMessage}
+                          </div>
+                        )}
+                        {downloadError && (
+                          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl font-medium">
+                            {downloadError}
+                          </div>
+                        )}
                       </div>
 
                       {/* Quick Summary Cards (Overall, Communication, Technical, Confidence) */}
@@ -2176,12 +2917,11 @@ const MockInterview = () => {
                           View Full Report
                         </button>
                         <button
-                          onClick={() => {
-                            alert("Downloading PDF Report...");
-                          }}
-                          className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
+                          disabled={isDownloading}
+                          onClick={handleDownloadPDF}
+                          className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Download Report
+                          {isDownloading ? "Generating Report..." : "Download Report"}
                         </button>
                         <button
                           onClick={() => navigate("/dashboard")}
@@ -2208,14 +2948,7 @@ const MockInterview = () => {
                       </div>
                     </div>
                   ) : activeReport ? (() => {
-                    const radarData = [
-                      { subject: "Confidence", value: activeReport.confidenceScore ?? activeReport.metrics?.confidence ?? 0 },
-                      { subject: "Communication", value: activeReport.communicationScore ?? activeReport.metrics?.communication ?? 0 },
-                      { subject: "Technical Accuracy", value: activeReport.technicalScore ?? activeReport.metrics?.technicalAccuracy ?? 0 },
-                      { subject: "Problem Solving", value: activeReport.problemSolvingScore ?? activeReport.score ?? 0 },
-                      { subject: "Professionalism", value: activeReport.confidenceScore ?? activeReport.metrics?.professionalism ?? 0 },
-                      { subject: "Eye Contact", value: activeReport.confidenceScore ?? activeReport.metrics?.eyeContact ?? 0 }
-                    ];
+                    const { radarData, overviewCards } = getAdaptiveMetrics(activeReport);
                     return (
                       <motion.div
                         key="report"
@@ -2236,34 +2969,32 @@ const MockInterview = () => {
                               AI Evaluation Report
                             </h1>
                             <p className="text-sm text-slate-400 mt-1">Detailed feedback report for {activeReport.role} mock interview at {activeReport.company}.</p>
+                            {downloadMessage && (
+                              <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl font-medium mt-2">
+                                {downloadMessage}
+                              </div>
+                            )}
+                            {downloadError && (
+                              <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl font-medium mt-2">
+                                {downloadError}
+                              </div>
+                            )}
                           </div>
                           <div className="flex gap-2.5">
                             <button
-                              onClick={() => alert("Downloading PDF summary report...")}
-                              className="px-4 py-2 border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-xs font-bold rounded-xl text-slate-300 hover:text-white transition-all cursor-pointer"
+                              disabled={isDownloading}
+                              onClick={handleDownloadPDF}
+                              className="px-4 py-2 border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-xs font-bold rounded-xl text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              Download PDF
+                              {isDownloading ? "Generating Report..." : "Download PDF"}
                             </button>
-                            <button
-                              onClick={() => alert("Copied shareable report link to clipboard.")}
-                              className="px-4 py-2 border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-xs font-bold rounded-xl text-slate-300 hover:text-white transition-all cursor-pointer"
-                            >
-                              Share Report
-                            </button>
+                            
                           </div>
                         </div>
 
                         {/* Overview Cards Metric Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-7 gap-4">
-                          {[
-                            { label: "Overall Score", val: `${activeReport.overallScore ?? activeReport.score}%`, col: "text-indigo-400 bg-indigo-500/10 border-indigo-500/25" },
-                            { label: "Communication", val: `${activeReport.communicationScore ?? activeReport.metrics?.communication}%`, col: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-                            { label: "Tech Knowledge", val: `${activeReport.technicalScore ?? activeReport.metrics?.technicalAccuracy}%`, col: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
-                            { label: "Problem Solving", val: `${activeReport.problemSolvingScore ?? (activeReport.score ? (activeReport.score + 2 > 100 ? 98 : activeReport.score + 2) : 0)}%`, col: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
-                            { label: "Confidence", val: `${activeReport.confidenceScore ?? activeReport.metrics?.confidence}%`, col: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
-                            { label: "Grammar Rating", val: "92%", col: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20" },
-                            { label: "Professionalism", val: `${activeReport.confidenceScore ?? activeReport.metrics?.professionalism}%`, col: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" }
-                          ].map((item, idx) => (
+                        <div className={`grid grid-cols-2 gap-4 ${overviewCards.length === 7 ? 'sm:grid-cols-7' : 'sm:grid-cols-6'}`}>
+                          {overviewCards.map((item, idx) => (
                             <div key={idx} className={`p-4 rounded-2xl border text-center relative overflow-hidden flex flex-col justify-between ${item.col}`}>
                               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-normal">{item.label}</span>
                               <span className="text-xl font-black text-white mt-3 block">{item.val}</span>
@@ -2428,7 +3159,7 @@ const MockInterview = () => {
                               Final Placement Recommendation
                             </h3>
                             <p className="text-xs text-slate-400 font-light leading-normal max-w-xl">
-                              Based on speech clarity, technical precision, and confidence indicators, we have mapped your readiness classification.
+                              Based on response depth, technical precision, and communication quality, we have mapped your readiness classification.
                             </p>
                           </div>
                           <div className={`px-6 py-3.5 rounded-2xl border text-center shrink-0 font-black text-sm tracking-wide uppercase ${
@@ -2522,8 +3253,8 @@ const MockInterview = () => {
                       ) : filteredHistory.length === 0 ? (
                         <div className="py-12 text-center max-w-sm mx-auto space-y-4">
                           <History className="w-12 h-12 text-slate-600 mx-auto" />
-                          <h3 className="text-base font-bold text-white">No Mock Records Found</h3>
-                          <p className="text-xs text-slate-400">Specify clean filter queries or launch a brand new AI interview to populate the archive.</p>
+                          <h3 className="text-base font-bold text-white">No interview reports available.</h3>
+                          <p className="text-xs text-slate-400 font-light">Specify clean filter queries or launch a brand new AI interview to populate the archive.</p>
                           <button
                             onClick={handleStartSetup}
                             className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer"
@@ -2651,6 +3382,69 @@ const MockInterview = () => {
 
           </main>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        <AnimatePresence>
+          {deleteTarget && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => { if (!isDeleting) setDeleteTarget(null); }}
+                className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
+              />
+
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                className="relative w-full max-w-md bg-[#080E24]/90 border border-white/10 rounded-2xl p-6 shadow-[0_0_50px_rgba(239,68,68,0.15)] backdrop-blur-xl overflow-hidden text-left"
+              >
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-red-500/50 to-transparent pointer-events-none" />
+                <div className="absolute -top-12 -right-12 w-24 h-24 rounded-full bg-red-500/10 blur-[40px] pointer-events-none" />
+
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 shrink-0">
+                    <Trash2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Delete Interview Report?</h3>
+                    <p className="text-sm text-slate-400 font-light mt-1.5 leading-relaxed">
+                      This action will permanently delete this interview report.<br />
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 mt-6 justify-end">
+                  <button
+                    disabled={isDeleting}
+                    onClick={() => setDeleteTarget(null)}
+                    className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white text-xs font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={isDeleting}
+                    onClick={handleConfirmDelete}
+                    className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.25)] hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      "Delete"
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Standard Logout Modal Wrapper */}
         <AnimatePresence>

@@ -4,6 +4,7 @@ import ResumeAnalysis from '../models/ResumeAnalysis.js';
 import { validateStartRequest, validateAnswerRequest } from '../utils/interviewValidation.js';
 import { generateFirstQuestion, evaluateInterviewAnswer, generateInterviewReport } from '../services/geminiInterviewService.js';
 import { DURATION_QUESTION_MAP } from '../config/interviewConfig.js';
+import { calculateInterviewStreak } from '../utils/streakUtility.js';
 
 
 /**
@@ -966,8 +967,11 @@ export const getInterviewHistory = async (req, res, next) => {
       };
     });
 
+    const interviewPracticeStreak = await calculateInterviewStreak(req.user._id);
+
     return res.status(200).json({
       success: true,
+      interviewPracticeStreak,
       history,
       pagination: {
         page,
@@ -981,6 +985,54 @@ export const getInterviewHistory = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Internal server error occurred while retrieving history.'
+    });
+  }
+};
+
+/**
+ * Deletes a specific interview session and its report.
+ * 
+ * @route DELETE /api/interview/:interviewId
+ * @access Private
+ */
+export const deleteInterviewSession = async (req, res, next) => {
+  try {
+    const { interviewId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Interview ID format.'
+      });
+    }
+
+    const session = await InterviewSession.findOne({ _id: interviewId });
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Interview session not found.'
+      });
+    }
+
+    // Verify ownership
+    if (session.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Denied: You do not own this interview session.'
+      });
+    }
+
+    await InterviewSession.findByIdAndDelete(interviewId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Interview report deleted successfully.'
+    });
+  } catch (error) {
+    console.error('Error in deleteInterviewSession controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to delete interview report: ${error.message}`
     });
   }
 };

@@ -1,5 +1,5 @@
 import express from 'express';
-import { startInterview, submitAnswer, getInterviewReport, getInterviewHistory } from '../controllers/interviewController.js';
+import { startInterview, submitAnswer, getInterviewReport, getInterviewHistory, deleteInterviewSession } from '../controllers/interviewController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -19,5 +19,9 @@ router.get('/history', protect, getInterviewHistory);
 // Route configuration: GET /api/interview/:interviewId/report
 // Requires JWT authentication (protect), retrieves the compiled report card
 router.get('/:interviewId/report', protect, getInterviewReport);
+
+// Route configuration: DELETE /api/interview/:interviewId
+// Requires JWT authentication (protect), deletes a specific interview session and report
+router.delete('/:interviewId', protect, deleteInterviewSession);
 
 export default router;

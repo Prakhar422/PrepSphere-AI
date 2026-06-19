@@ -529,7 +529,16 @@ export const getDashboardData = async (req, res, next) => {
     if (totalCompleted === 0) {
       return res.status(200).json({
         success: true,
-        hasAttempts: false
+        hasAttempts: false,
+        overallStats: {
+          averageAccuracy: 0,
+          completedCount: 0,
+          questionsSolved: 0,
+          highestAccuracy: 0,
+          highestCategory: '',
+          streak: 0,
+          rank: 'Needs Improvement'
+        }
       });
     }
 
@@ -543,7 +552,15 @@ export const getDashboardData = async (req, res, next) => {
               $group: {
                 _id: null,
                 avgAccuracy: { $avg: '$accuracy' },
-                bestAccuracy: { $max: '$accuracy' }
+                bestAccuracy: { $max: '$accuracy' },
+                totalSolved: {
+                  $sum: {
+                    $subtract: [
+                      { $ifNull: ['$totalQuestions', 10] },
+                      { $ifNull: ['$skippedQuestions', 0] }
+                    ]
+                  }
+                }
               }
             }
           ],
@@ -561,10 +578,11 @@ export const getDashboardData = async (req, res, next) => {
       }
     ]);
 
-    const overall = aggregationResult[0]?.overallStats[0] || { avgAccuracy: 0, bestAccuracy: 0 };
+    const overall = aggregationResult[0]?.overallStats[0] || { avgAccuracy: 0, bestAccuracy: 0, totalSolved: 0 };
     const categoryStats = aggregationResult[0]?.categoryStats || [];
 
     const averageAccuracy = Math.round(overall.avgAccuracy);
+    const questionsSolved = overall.totalSolved || 0;
 
     // Calculate rank
     let rank = 'Needs Improvement';
@@ -790,6 +808,7 @@ export const getDashboardData = async (req, res, next) => {
         completedCount: totalCompleted,
         highestAccuracy,
         highestCategory,
+        questionsSolved,
         streak,
         rank
       },

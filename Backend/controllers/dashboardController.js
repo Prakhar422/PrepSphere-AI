@@ -1,6 +1,7 @@
 import ResumeAnalysis from '../models/ResumeAnalysis.js';
 import QuizAttempt from '../models/QuizAttempt.js';
 import InterviewSession from '../models/InterviewSession.js';
+import { calculateInterviewStreak } from '../utils/streakUtility.js';
 
 /**
  * @desc    Fetch the summary of the latest resume analysis for the authenticated user
@@ -287,6 +288,8 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
       latestInterview = completedInterviews[0];
     }
 
+    const interviewPracticeStreak = await calculateInterviewStreak(completedInterviews);
+
     // 4. Calculate Placement Readiness
     // Weights: Resume (30%), Aptitude (30%), Mock Interview (40%)
     let readiness = 0;
@@ -476,6 +479,7 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
+      interviewPracticeStreak,
       resumeSummary: {
         hasResume,
         atsScore: latestAtsScore,
@@ -510,7 +514,8 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
           date: latestInterview.completedAt ? new Date(latestInterview.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "",
           category: latestInterview.interviewType,
           communicationScore: latestInterview.report ? latestInterview.report.communicationScore : 0
-        } : null
+        } : null,
+        interviewPracticeStreak
       },
       readiness,
       activities: combinedActivities.slice(0, 10)

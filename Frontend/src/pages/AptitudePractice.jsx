@@ -1098,7 +1098,7 @@ const AptitudePractice = () => {
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
-                              Highest Accuracy
+                              Questions Solved
                             </span>
                             <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
                               <CheckCircle2 className="w-4 h-4" />
@@ -1106,16 +1106,16 @@ const AptitudePractice = () => {
                           </div>
                           <div className="mt-4">
                             <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-                              {dashboardData?.overallStats?.highestAccuracy ??
+                              {dashboardData?.overallStats?.questionsSolved ??
                                 0}
-                              %
                             </span>
                           </div>
                           <div className="mt-2 text-xs text-purple-400 font-semibold truncate">
                             <span>
-                              Achieved in{" "}
-                              {dashboardData?.overallStats?.highestCategory ||
-                                "N/A"}
+                              {(!dashboardData?.overallStats?.questionsSolved ||
+                                dashboardData?.overallStats?.questionsSolved === 0)
+                                ? "Start solving questions to build your progress."
+                                : "Lifetime Questions Solved"}
                             </span>
                           </div>
                         </div>

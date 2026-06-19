@@ -64,8 +64,16 @@ export const generateFirstQuestion = async ({
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
     generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          question: { type: 'string' }
+        },
+        required: ['question']
+      },
       temperature: 0.7,
-      maxOutputTokens: 500
+      maxOutputTokens: 1000
     }
   });
 
@@ -90,7 +98,7 @@ Intelligent Coverage Rules:
 
 - Creative & Unique: Never ask the same generic template question repeatedly. Vary your choice of topic, technology, or scenario.
 - Single Question: Return exactly one question.
-- Format: Return ONLY the text message of the question itself. Do not use any markdown formatting (such as code blocks \`\`\` or bold asterisks **), JSON structures, or explanation text.
+- Format: Return a JSON object conforming exactly to the response schema: {"question": "string"}. Do not use any markdown code block formatting (such as \`\`\`json) or explanation text outside the JSON.
 - Language: The question must be generated in ${language}. If Mixed, use a professional blend of English and Hindi. If Hindi, write the question in Hindi. If English, write in professional English.
 
 ${resumeContext ? `Candidate Resume Context:
@@ -109,12 +117,15 @@ ${resumeContext}` : ''}`;
     });
   });
 
-  let question = result.response.text().trim();
-  
-  // Clean any accidental markdown wraps
-  if (question.startsWith('```')) {
-    question = question.replace(/^\s*```(?:[a-zA-Z]+)?\s*/, '').replace(/\s*```\s*$/, '').trim();
+  const rawText = result.response.text();
+  const cleaned = cleanJsonResponseText(rawText);
+  const parsed = JSON.parse(cleaned);
+
+  if (!parsed || typeof parsed !== 'object' || typeof parsed.question !== 'string' || !parsed.question.trim()) {
+    throw new Error('Gemini response JSON does not contain a valid question.');
   }
+
+  const question = parsed.question.trim();
 
   // Get token usage metadata from the response
   const usage = result.response.usageMetadata || {};

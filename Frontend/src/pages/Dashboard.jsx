@@ -86,7 +86,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardSummary = async () => {
       try {
-        const response = await api.get("/dashboard/summary");
+        const response = await api.get(`/dashboard/summary?t=${Date.now()}`);
         if (response.data && response.data.success) {
           setResumeSummary({
             hasResume: response.data.resumeSummary.hasResume,
