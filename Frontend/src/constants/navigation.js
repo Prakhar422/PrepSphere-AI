@@ -46,12 +46,12 @@ export const sidebarNavigation = [
     path: "/interview-experiences",
     icon: BookOpen
   },
-  {
-    id: "careerAnalytics",
-    label: "Career Analytics",
-    path: "/career-analytics",
-    icon: LineChart
-  },
+  // {
+  //   id: "careerAnalytics",
+  //   label: "Career Analytics",
+  //   path: "/career-analytics",
+  //   icon: LineChart
+  // },
   {
     id: "settings",
     label: "Settings",

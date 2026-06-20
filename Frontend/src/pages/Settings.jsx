@@ -434,120 +434,7 @@ const Settings = () => {
                   </form>
                 </section>
 
-                {/* APPEARANCE CUSTOMIZATION CARD */}
-                <section className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg text-left">
-                  <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
-                  
-                  <h3 className="text-base font-semibold text-white mb-6 flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-400" />
-                    Appearance &amp; Preferences
-                  </h3>
-
-                  <div className="space-y-6 text-xs sm:text-sm">
-                    {/* Theme Choice */}
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-4 border-b border-white/5">
-                      <div>
-                        <span className="block font-bold text-white uppercase tracking-wide">Interface Theme</span>
-                        <span className="text-xs text-slate-400 font-light mt-0.5 block">Toggle application dark/light theme interface.</span>
-                      </div>
-                      <div className="flex gap-2 font-bold">
-                        <button
-                          type="button"
-                          className="px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 cursor-pointer shadow-md"
-                        >
-                          Dark Theme
-                        </button>
-                        <button
-                          type="button"
-                          disabled
-                          className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-slate-600 cursor-not-allowed"
-                          title="Light Theme coming soon"
-                        >
-                          Light Theme
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Accent colors bubbles */}
-                    <div className="flex justify-between items-center pb-4 border-b border-white/5">
-                      <div>
-                        <span className="block font-bold text-white uppercase tracking-wide">Accent Theme Color</span>
-                        <span className="text-xs text-slate-400 font-light mt-0.5 block">Change focal brand highlights colors.</span>
-                      </div>
-                      <div className="flex gap-3">
-                        {[
-                          { key: "purple", color: "bg-purple-500", ring: "ring-purple-500" },
-                          { key: "blue", color: "bg-blue-500", ring: "ring-blue-500" },
-                          { key: "cyan", color: "bg-cyan-400", ring: "ring-cyan-400" },
-                          { key: "emerald", color: "bg-emerald-500", ring: "ring-emerald-500" }
-                        ].map((col) => (
-                          <button
-                            key={col.key}
-                            type="button"
-                            onClick={() => setAccentColor(col.key)}
-                            className={`w-6 h-6 rounded-full cursor-pointer transition-all hover:scale-110 ${col.color} ${
-                              accentColor === col.key ? `ring-2 ring-offset-2 ring-offset-[#080E24] ${col.ring}` : ""
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Interface Density */}
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-4 border-b border-white/5">
-                      <div>
-                        <span className="block font-bold text-white uppercase tracking-wide">Layout Density</span>
-                        <span className="text-xs text-slate-400 font-light mt-0.5 block">Configure application text spacing and density.</span>
-                      </div>
-                      <div className="flex gap-2 font-bold">
-                        <button
-                          type="button"
-                          onClick={() => setDensity("comfortable")}
-                          className={`px-4 py-2 rounded-xl border text-xs transition-all cursor-pointer ${
-                            density === "comfortable"
-                              ? "bg-white/5 border-white/20 text-white"
-                              : "bg-transparent border-white/5 text-slate-500"
-                          }`}
-                        >
-                          Comfortable
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDensity("compact")}
-                          className={`px-4 py-2 rounded-xl border text-xs transition-all cursor-pointer ${
-                            density === "compact"
-                              ? "bg-white/5 border-white/20 text-white"
-                              : "bg-transparent border-white/5 text-slate-500"
-                          }`}
-                        >
-                          Compact
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Motion Toggle */}
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <span className="block font-bold text-white uppercase tracking-wide">Motion Transitions</span>
-                        <span className="text-xs text-slate-400 font-light mt-0.5 block">Enable custom Framer Motion transitions.</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setAnimationsEnabled(!animationsEnabled)}
-                        className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer outline-none ${
-                          animationsEnabled ? "bg-indigo-600" : "bg-slate-800"
-                        }`}
-                      >
-                        <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                            animationsEnabled ? "translate-x-4" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                  </div>
-                </section>
+                
 
                 {/* CONNECTED ACCOUNTS INTEGRATION SECTION */}
                 <section className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg text-left">
@@ -624,35 +511,9 @@ const Settings = () => {
                         </div>
                       </div>
 
-                      {/* LinkedIn Connection Card (Coming Soon) */}
-                      <div className="p-4 rounded-2xl bg-white/[0.01] border border-white/5 opacity-55 flex flex-col justify-between h-[130px]">
-                        <div className="flex justify-between items-center">
-                          <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-sm">IN</div>
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded font-mono text-slate-500 bg-white/5">Coming Soon</span>
-                        </div>
-                        <div className="mt-2 text-left">
-                          <h4 className="text-xs font-bold text-slate-300">LinkedIn Connect</h4>
-                          <span className="text-[9px] text-slate-500 font-light mt-0.5 block">Sync professional resumes.</span>
-                        </div>
-                        <div className="border-t border-white/5 pt-2 mt-2 flex justify-end">
-                          <span className="text-[10px] text-slate-600 font-bold">Coming Soon</span>
-                        </div>
-                      </div>
+                      
 
-                      {/* LeetCode Connection Card (Coming Soon) */}
-                      <div className="p-4 rounded-2xl bg-white/[0.01] border border-white/5 opacity-55 flex flex-col justify-between h-[130px]">
-                        <div className="flex justify-between items-center">
-                          <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold text-sm">LC</div>
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded font-mono text-slate-500 bg-white/5">Coming Soon</span>
-                        </div>
-                        <div className="mt-2 text-left">
-                          <h4 className="text-xs font-bold text-slate-300">LeetCode Sync</h4>
-                          <span className="text-[9px] text-slate-500 font-light mt-0.5 block">Import solved question counts.</span>
-                        </div>
-                        <div className="border-t border-white/5 pt-2 mt-2 flex justify-end">
-                          <span className="text-[10px] text-slate-600 font-bold">Coming Soon</span>
-                        </div>
-                      </div>
+                      
 
                     </div>
                   )}
@@ -683,6 +544,25 @@ const Settings = () => {
                         className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 border border-red-500/25 hover:bg-red-500/10 cursor-pointer transition-colors"
                       >
                         Delete Resume History
+                      </button>
+                    </div>
+
+                    {/* Delete Aptitude History */}
+
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 py-3 border-b border-red-500/10 last:border-0 last:pb-0">
+                      <div>
+                        <span className="block font-bold text-white uppercase tracking-wide">Delete Aptitude History</span>
+                        <span className="text-xs text-slate-400 font-light mt-0.5 block">Permanently remove all aptitude quizzes, scores, and progress.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteTarget("Aptitude Practice");
+                          setModalType("delete-history");
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 border border-red-500/25 hover:bg-red-500/10 cursor-pointer transition-colors"
+                      >
+                        Delete Aptitude History
                       </button>
                     </div>
 
@@ -875,10 +755,7 @@ const Settings = () => {
 
                     {/* About Actions Links */}
                     <div className="space-y-2 font-bold">
-                      <button onClick={() => alert("Visit prepsphere.ai")} className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer">
-                        <span>Visit Website</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      
                       <button onClick={() => alert("Contact support@prepsphere.ai")} className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer">
                         <span>Contact Support</span>
                         <ChevronRight className="w-3.5 h-3.5" />

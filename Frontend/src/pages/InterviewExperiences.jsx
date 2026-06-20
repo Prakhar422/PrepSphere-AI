@@ -690,11 +690,11 @@ const InterviewExperiences = () => {
                           </div>
                           <span className="text-[9px] font-bold text-slate-500 uppercase font-mono">{company.difficulty}</span>
                         </div>
-                        <div className="mt-4">
+                        <div className="mt-3">
                           <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{company.name}</h4>
                           <span className="text-[10px] text-slate-400 font-light mt-0.5 block">{company.count}</span>
                         </div>
-                        <div className="border-t border-white/5 pt-2 mt-2 flex justify-between text-[9px] font-mono text-slate-400">
+                        <div className="border-t border-white/5 pt-1.5 mt-1 flex justify-between text-[9px] font-mono text-slate-400">
                           <span>Avg Package</span>
                           <span className="font-bold text-indigo-400">{company.package}</span>
                         </div>

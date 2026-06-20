@@ -98,14 +98,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/coding-tracker"
-            element={
-              <ProtectedRoute>
-                <CodingJourney />
-              </ProtectedRoute>
-            }
-          />
+          
           <Route
             path="/interview-experiences"
             element={

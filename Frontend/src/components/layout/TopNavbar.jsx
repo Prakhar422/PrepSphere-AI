@@ -68,10 +68,10 @@ const TopNavbar = ({
       {/* Bell Notification & User Profile Greeting */}
       <div className="flex items-center space-x-6 shrink-0 pl-4">
         {children}
-        <button className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
+        {/* <button className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-indigo-500" />
-        </button>
+        </button> */}
 
         <div className="flex items-center space-x-3 border-l border-white/5 pl-6">
           <div className="text-right hidden sm:block">
