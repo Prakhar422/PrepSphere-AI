@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
+import Sidebar from "../components/layout/Sidebar";
+import TopNavbar from "../components/layout/TopNavbar";
 import {
   LayoutDashboard,
   Brain,
@@ -32,10 +34,9 @@ import {
 } from "lucide-react";
 
 const QuizHistory = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // States
   const [historyList, setHistoryList] = useState([]);
@@ -55,17 +56,6 @@ const QuizHistory = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [successToast, setSuccessToast] = useState("");
-
-  const navItems = [
-    { name: "Dashboard", icon: LayoutDashboard, active: false, path: "/dashboard" },
-    { name: "Aptitude Practice", icon: Brain, active: true, path: "/aptitude-practice" },
-    { name: "Resume Analyzer", icon: FileSearch, active: false, path: "/resume-analyzer" },
-    { name: "Mock Interview", icon: MessageSquareCode, active: false, path: "/mock-interview" },
-    { name: "Coding Journey", icon: Code2, active: false, path: "/coding-journey" },
-    { name: "Interview Experiences", icon: BookOpen, active: false, path: "/interview-experiences" },
-    { name: "Career Analytics", icon: LineChart, active: false, path: "/career-analytics" },
-    { name: "Settings", icon: SettingsIcon, active: false, path: "/settings" },
-  ];
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -88,11 +78,6 @@ const QuizHistory = () => {
   useEffect(() => {
     fetchHistory();
   }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
 
   // Delete Attempt Action
   const handleDeleteAttempt = async () => {
@@ -202,174 +187,20 @@ const QuizHistory = () => {
         <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
         <div className="absolute bottom-[10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-purple-500/5 blur-[130px] pointer-events-none" />
 
-        {/* SIDEBAR - DESKTOP */}
-        <aside className="fixed left-0 top-0 h-screen w-[280px] hidden lg:flex flex-col bg-slate-950/40 border-r border-white/5 backdrop-blur-xl z-20 overflow-hidden">
-          {/* Logo */}
-          <div className="p-6 flex items-center space-x-3 border-b border-white/5">
-            <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-slate-950/80 border border-white/10 overflow-hidden shadow-[0_0_15px_rgba(99,102,241,0.25)]">
-              <svg className="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" fill="currentColor" className="text-indigo-500 animate-pulse" />
-                <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M19.07 19.07l-1.41-1.41M6.34 6.34l-1.41-1.41" />
-              </svg>
-            </div>
-            <span className="text-base font-extrabold tracking-tight text-white font-inter">
-              PrepSphere <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">AI</span>
-            </span>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-            {navItems.map((item, idx) => (
-              <button
-                key={idx}
-                onClick={() => navigate(item.path)}
-                className={`w-full flex items-center space-x-3.5 px-4 py-3 rounded-xl text-left text-base font-medium transition-all duration-200 cursor-pointer ${
-                  item.active
-                    ? "bg-gradient-to-r from-indigo-500/15 to-purple-500/10 text-indigo-300 border border-indigo-500/25 shadow-[0_4px_20px_rgba(99,102,241,0.08)]"
-                    : "text-slate-400 hover:text-white hover:bg-white/[0.03] border border-transparent"
-                }`}
-              >
-                <item.icon className={`w-4 h-4 ${item.active ? "text-indigo-400" : "text-slate-500"}`} />
-                <span>{item.name}</span>
-              </button>
-            ))}
-          </nav>
-
-          {/* Bottom Actions */}
-          <div className="p-4 border-t border-white/5">
-            <button
-              onClick={() => setShowLogoutModal(true)}
-              className="w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl text-left text-base font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 cursor-pointer focus:outline-none"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
-            </button>
-          </div>
-        </aside>
-
-        {/* MOBILE DRAWER SIDEBAR */}
-        <AnimatePresence>
-          {sidebarOpen && (
-            <>
-              {/* Overlay */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setSidebarOpen(false)}
-                className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-              />
-
-              {/* Sidebar Drawer Container */}
-              <motion.aside
-                initial={{ x: "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "-100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed inset-y-0 left-0 z-50 w-[280px] bg-[#050B1F]/95 border-r border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col justify-between lg:hidden"
-              >
-                <div>
-                  <div className="p-5 flex items-center justify-between border-b border-white/5">
-                    <div className="flex items-center space-x-2.5">
-                      <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center">
-                        <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="3" fill="currentColor" />
-                          <path d="M12 2v2M12 20v2M4 12H2M22 12h-2" />
-                        </svg>
-                      </div>
-                      <span className="text-base font-bold text-white">PrepSphere AI</span>
-                    </div>
-                    <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <nav className="px-3 py-5 space-y-1">
-                    {navItems.map((item, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setSidebarOpen(false);
-                          navigate(item.path);
-                        }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-left text-base font-medium transition-all duration-200 ${
-                          item.active
-                            ? "bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-indigo-300 border-l-[3px] border-indigo-500 pl-3.5"
-                            : "text-slate-400 hover:text-white hover:bg-white/5 pl-4"
-                        }`}
-                      >
-                        <item.icon className="w-4 h-4" />
-                        <span>{item.name}</span>
-                      </button>
-                    ))}
-                  </nav>
-                </div>
-
-                <div className="p-4 border-t border-white/5">
-                  <button
-                    onClick={() => {
-                      setSidebarOpen(false);
-                      setShowLogoutModal(true);
-                    }}
-                    className="w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl text-left text-base font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              </motion.aside>
-            </>
-          )}
-        </AnimatePresence>
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         {/* MAIN DISPLAY CONTAINER */}
         <div className="lg:ml-[280px] flex-1 flex flex-col h-screen overflow-y-auto z-10 relative">
-          {/* TOP NAVBAR */}
-          <header className="sticky top-0 z-30 bg-[#050B1F]/70 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4 flex-1 max-w-lg">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 lg:hidden focus:outline-none shrink-0"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              
-              <div className="relative w-full group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
-                  <Search className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search by category..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full bg-slate-950/40 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white text-sm focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/30 transition-all duration-300 placeholder:text-slate-600"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-6 shrink-0 pl-4">
-              <button className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors focus:outline-none">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-indigo-500" />
-              </button>
-              
-              <div className="flex items-center space-x-3 border-l border-white/5 pl-6">
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-semibold text-white">Welcome Back, {user?.name?.split(" ")[0] || "User"}</p>
-                  <p className="text-xs text-slate-400 mt-0.5 max-w-[150px] truncate">{user?.college || "PrepSphere College"}</p>
-                </div>
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[1px] shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-                  <div className="w-full h-full rounded-xl bg-[#080E24] flex items-center justify-center text-indigo-400 text-sm font-bold">
-                     {user?.name ? user.name.charAt(0).toUpperCase() : <UserIcon className="w-4 h-4" />}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </header>
+          
+          <TopNavbar
+            onMenuClick={() => setSidebarOpen(true)}
+            searchQuery={searchQuery}
+            setSearchQuery={(val) => {
+              setSearchQuery(val);
+              setCurrentPage(1);
+            }}
+            searchPlaceholder="Search by category..."
+          />
 
           {/* MAIN PAGE BODY */}
           <main className="flex-1 p-6 space-y-8 max-w-7xl mx-auto w-full">
@@ -757,57 +588,7 @@ const QuizHistory = () => {
           )}
         </AnimatePresence>
 
-        {/* LOGOUT CONFIRMATION MODAL */}
-        <AnimatePresence>
-          {showLogoutModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowLogoutModal(false)}
-                className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
-              />
 
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                transition={{ type: "spring", damping: 25, stiffness: 350 }}
-                className="relative w-full max-w-md bg-[#080E24]/90 border border-white/10 rounded-2xl p-6 shadow-[0_0_50px_rgba(99,102,241,0.15)] backdrop-blur-xl overflow-hidden text-left"
-              >
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-red-500/50 to-transparent pointer-events-none" />
-
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 shrink-0">
-                    <LogOut className="w-6 h-6 animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Confirm Sign Out</h3>
-                    <p className="text-sm text-slate-400 font-light mt-1.5 leading-relaxed">
-                      Are you sure you want to log out of PrepSphere AI? You will need to sign in again to access your dashboard.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex space-x-3 mt-6 justify-end">
-                  <button
-                    onClick={() => setShowLogoutModal(false)}
-                    className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white text-sm font-medium transition-all duration-200 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.25)] hover:shadow-[0_0_20px_rgba(239,68,68,0.4)]"
-                  >
-                    Sign Out
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
       </div>
     </>
   );
