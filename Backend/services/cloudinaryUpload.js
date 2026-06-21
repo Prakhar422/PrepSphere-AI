@@ -54,3 +54,53 @@ export const deleteFromCloudinary = async (publicId) => {
   }
 };
 
+/**
+ * Uploads an image buffer to Cloudinary using upload streams
+ * @param {Buffer} buffer - In-memory file buffer from Multer
+ * @param {string} originalName - Original filename for sanitization and naming
+ * @returns {Promise<object>} Resolves with secure_url and public_id from Cloudinary
+ */
+export const uploadImageToCloudinary = (buffer, originalName) => {
+  return new Promise((resolve, reject) => {
+    const sanitizedOriginal = originalName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const publicIdName = `avatar-${uniqueSuffix}-${sanitizedOriginal}`;
+
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'PrepSphereAI/Profiles',
+        resource_type: 'image',
+        public_id: publicIdName,
+      },
+      (error, result) => {
+        if (error) {
+          console.error('Cloudinary image upload error:', error);
+          return reject(new Error(`Cloudinary upload failed: ${error.message}`));
+        }
+        
+        resolve({
+          secure_url: result.secure_url,
+          public_id: result.public_id,
+        });
+      }
+    );
+
+    stream.end(buffer);
+  });
+};
+
+/**
+ * Deletes an image from Cloudinary using its public_id
+ * @param {string} publicId - The Cloudinary public ID of the resource
+ * @returns {Promise<object>} Resolves with Cloudinary destroy result
+ */
+export const deleteImageFromCloudinary = async (publicId) => {
+  try {
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+    return result;
+  } catch (error) {
+    console.error('Cloudinary image deletion error:', error);
+    throw new Error(`Cloudinary image deletion failed: ${error.message}`);
+  }
+};
+

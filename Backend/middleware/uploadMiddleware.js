@@ -69,3 +69,60 @@ export const uploadResume = (req, res, next) => {
     next();
   });
 };
+
+// Profile image upload configuration
+const imageFileFilter = (req, file, cb) => {
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+  const ext = file.originalname.includes('.')
+    ? '.' + file.originalname.split('.').pop().toLowerCase()
+    : '';
+
+  const isAllowedExt = allowedExtensions.includes(ext);
+  const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const isAllowedMime = allowedMimeTypes.includes(file.mimetype);
+
+  if (isAllowedExt && isAllowedMime) {
+    cb(null, true);
+  } else {
+    cb(new Error('Unsupported file type. Only JPG, JPEG, PNG and WEBP files are allowed!'), false);
+  }
+};
+
+const uploadImg = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB
+  },
+}).single('profileImage');
+
+export const uploadProfileImage = (req, res, next) => {
+  uploadImg(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          message: 'File is too large. Maximum size allowed is 5 MB.',
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: `File upload error: ${err.message}`,
+      });
+    } else if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded.',
+      });
+    }
+
+    next();
+  });
+};

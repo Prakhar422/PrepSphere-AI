@@ -24,6 +24,7 @@ const TopNavbar = ({
   // Resolve display values (prop overrides or auth fallbacks)
   const displayName = userName !== undefined ? userName : (user?.name || "User");
   const displayCollege = userCollege !== undefined ? userCollege : (user?.college || "PrepSphere College");
+  const displayProfilePic = profilePic !== undefined ? profilePic : (user?.profileImage || "");
   const displayAvatarLetter = displayName.charAt(0).toUpperCase() || "U";
 
   // Dynamic placeholder lookup
@@ -84,8 +85,8 @@ const TopNavbar = ({
           </div>
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[1px] shadow-[0_0_15px_rgba(99,102,241,0.2)]">
             <div className="w-full h-full rounded-xl bg-[#080E24] flex items-center justify-center text-indigo-400 text-sm font-bold overflow-hidden">
-              {profilePic ? (
-                <img src={profilePic} alt="Avatar" className="w-full h-full object-cover" />
+              {displayProfilePic ? (
+                <img src={displayProfilePic} alt="Avatar" className="w-full h-full object-cover" />
               ) : displayName ? (
                 displayAvatarLetter
               ) : (

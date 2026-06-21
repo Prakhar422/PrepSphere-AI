@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
+import { getAllExperiences, getMetadata } from "../services/interviewExperienceService";
 import {
   LayoutDashboard,
   Brain,
@@ -20,6 +22,7 @@ import {
   Sparkles,
   Flame,
   Award,
+  ChevronLeft,
   ChevronRight,
   Play,
   Calendar,
@@ -275,6 +278,31 @@ const FAQ_LIST = [
   { q: "What is expected in HR interviews?", a: "HR rounds check culture fit, salary expectations, relocation preferences, and career alignment. Be honest, show interest in the company values, and prepare examples of conflict resolution or projects teamwork." }
 ];
 
+// Skeleton loader for loading state representation
+const ExperienceSkeleton = () => (
+  <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden animate-pulse flex flex-col gap-4">
+    <div className="flex justify-between items-center border-b border-white/5 pb-3">
+      <div className="flex items-center space-x-3">
+        <div className="w-9 h-9 rounded-xl bg-white/5" />
+        <div className="space-y-2">
+          <div className="h-3 w-24 bg-white/10 rounded" />
+          <div className="h-2.5 w-32 bg-white/5 rounded" />
+        </div>
+      </div>
+      <div className="h-4 w-16 bg-white/5 rounded" />
+    </div>
+    <div className="space-y-3">
+      <div className="h-3 w-40 bg-white/5 rounded" />
+      <div className="h-4 w-3/4 bg-white/10 rounded" />
+      <div className="h-3.5 w-full bg-white/5 rounded" />
+    </div>
+    <div className="flex gap-2">
+      <div className="h-6 w-12 bg-white/5 rounded-lg" />
+      <div className="h-6 w-12 bg-white/5 rounded-lg" />
+    </div>
+  </div>
+);
+
 const InterviewExperiences = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -296,7 +324,7 @@ const InterviewExperiences = () => {
   const [newExpTips, setNewExpTips] = useState("");
 
   // Feed State list (supports dynamic adds in local state)
-  const [experiences, setExperiences] = useState(INITIAL_EXPERIENCES);
+  const [experiences, setExperiences] = useState([]);
   const [selectedExperience, setSelectedExperience] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -312,37 +340,149 @@ const InterviewExperiences = () => {
   const [filterMode, setFilterMode] = useState("All");
   const [sortBy, setSortBy] = useState("Latest");
 
+  // Pagination & Loading & Error States
+  const [loadingFeed, setLoadingFeed] = useState(true);
+  const [loadingMeta, setLoadingMeta] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+
+  // Dynamic Metadata States
+  const [featuredCompanies, setFeaturedCompanies] = useState([]);
+  const [communityStats, setCommunityStats] = useState([
+    { label: "Total Experiences", val: "0", suffix: "+" },
+    { label: "Top Companies", val: "0", suffix: "" },
+    { label: "Monthly Posts", val: "0", suffix: "" },
+    { label: "Active Contributors", val: "0", suffix: "" },
+    { label: "Average Package", val: "0", suffix: " LPA" }
+  ]);
+
+  // Debounced search query (updates after 400ms delay)
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Fetch meta details (featured companies, stats) on mount
+  const fetchMeta = useCallback(async () => {
+    setLoadingMeta(true);
+    try {
+      const data = await getMetadata();
+      if (data && data.success) {
+        setCommunityStats([
+          { label: "Total Experiences", val: String(data.stats.totalExperiences), suffix: "+" },
+          { label: "Top Companies", val: String(data.stats.totalCompanies), suffix: "" },
+          { label: "Monthly Posts", val: String(data.stats.monthlyPosts), suffix: "" },
+          { label: "Active Contributors", val: String(data.stats.totalContributors), suffix: "" },
+          { label: "Average Package", val: String(data.stats.averagePackage), suffix: " LPA" }
+        ]);
+        setFeaturedCompanies(data.featuredCompanies || []);
+      }
+    } catch (err) {
+      console.error("Error fetching metadata:", err);
+    } finally {
+      setLoadingMeta(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMeta();
+  }, [fetchMeta]);
+
+  // Fetch experiences feed list
+  const fetchFeed = useCallback(async () => {
+    setLoadingFeed(true);
+    setError(null);
+    try {
+      const params = {
+        page: currentPage,
+        limit: 5,
+        search: debouncedSearch,
+        company: filterCompany === "All" ? "" : filterCompany,
+        role: filterRole === "All" ? "" : filterRole,
+        difficulty: filterDifficulty === "All" ? "" : filterDifficulty,
+        interviewType: filterMode === "All" ? "" : filterMode,
+        sortBy: sortBy === "Latest" ? "newest" : 
+                sortBy === "Oldest" ? "oldest" :
+                sortBy === "Highest Package" ? "highestPackage" :
+                sortBy === "Lowest Package" ? "lowestPackage" : "newest"
+      };
+
+      const data = await getAllExperiences(params);
+      if (data && data.success) {
+        setExperiences(data.experiences || []);
+        setTotalPages(data.totalPages || 1);
+        setTotalResults(data.totalResults || 0);
+      } else {
+        throw new Error("Failed to load interview experiences.");
+      }
+    } catch (err) {
+      console.error("Error loading experiences:", err);
+      setError("Unable to load interview experiences. Please try again later.");
+    } finally {
+      setLoadingFeed(false);
+    }
+  }, [currentPage, debouncedSearch, filterCompany, filterRole, filterDifficulty, filterMode, sortBy]);
+
+  useEffect(() => {
+    fetchFeed();
+  }, [fetchFeed]);
+
+  const handlePageChange = (pageNumber) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
+
+  const handleSelectExperience = (exp) => {
+    const timeline = [];
+    if (exp.onlineAssessment) {
+      timeline.push({ roundName: "Online Assessment", date: "Round 1", status: "completed", desc: exp.onlineAssessment });
+    }
+    if (exp.technicalRound1) {
+      timeline.push({ roundName: "Technical Round 1", date: "Round 2", status: "completed", desc: exp.technicalRound1 });
+    }
+    if (exp.technicalRound2) {
+      timeline.push({ roundName: "Technical Round 2", date: "Round 3", status: "completed", desc: exp.technicalRound2 });
+    }
+    if (exp.technicalRound3) {
+      timeline.push({ roundName: "Technical Round 3", date: "Round 4", status: "completed", desc: exp.technicalRound3 });
+    }
+    if (exp.hrRound) {
+      timeline.push({ roundName: "HR Round", date: "Final Round", status: "completed", desc: exp.hrRound });
+    }
+
+    const mapped = {
+      ...exp,
+      authorName: exp.user?.name || "PrepSphere Contributor",
+      authorCollege: exp.user?.college || exp.college || "PrepSphere College",
+      authorAvatar: exp.user?.name ? exp.user.name.charAt(0).toUpperCase() : "U",
+      date: new Date(exp.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+      mode: exp.interviewType,
+      package: exp.package ? `${exp.package} LPA` : "N/A",
+      verdict: exp.result,
+      summary: exp.overallExperience ? exp.overallExperience.substring(0, 200) + "..." : "",
+      timeline,
+      questionsAsked: exp.tags || [],
+      prepTips: exp.preparationTips || "Understand algorithms complexity bounds.",
+      resources: "LeetCode Premium, PrepSphere Tracker.",
+      candidateAdvice: "Ask clarifying questions early."
+    };
+    setSelectedExperience(mapped);
+    setModalOpen(true);
+  };
+
+  const filteredExperiences = experiences;
+
   // Accordion faq expanded keys
   const [expandedFaqs, setExpandedFaqs] = useState({});
-
-  // Filter application
-  const filteredExperiences = useMemo(() => {
-    if (isEmptyState) return [];
-    return experiences
-      .filter((exp) => {
-        const matchesSearch =
-          exp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          exp.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          exp.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          exp.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
-
-        const matchesCompany = filterCompany === "All" || exp.company === filterCompany;
-        const matchesRole =
-          filterRole === "All" ||
-          (filterRole === "Software Engineer" && exp.role.includes("Software")) ||
-          (filterRole === "Cloud Support" && exp.role.includes("Cloud"));
-
-        const matchesDifficulty = filterDifficulty === "All" || exp.difficulty === filterDifficulty;
-        const matchesMode = filterMode === "All" || exp.mode === filterMode;
-
-        return matchesSearch && matchesCompany && matchesRole && matchesDifficulty && matchesMode;
-      })
-      .sort((a, b) => {
-        if (sortBy === "Most Liked") return b.likes - a.likes;
-        // Default to latest
-        return new Date(b.date) - new Date(a.date);
-      });
-  }, [experiences, searchQuery, filterCompany, filterRole, filterDifficulty, filterMode, sortBy, isEmptyState]);
 
 
 
@@ -392,6 +532,7 @@ const InterviewExperiences = () => {
     setFilterDifficulty("All");
     setFilterMode("All");
     setSortBy("Latest");
+    setCurrentPage(1);
   };
 
   const handleScrollToSection = (id) => {
@@ -557,7 +698,7 @@ const InterviewExperiences = () => {
               </div>
             </section>
 
-            {isEmptyState ? (
+            {(!loadingFeed && experiences.length === 0) || isEmptyState ? (
               /* EMPTY STATE LAYOUT */
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
@@ -568,9 +709,9 @@ const InterviewExperiences = () => {
                   <BookOpen className="w-8 h-8" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-lg font-bold text-white">No Interview Experiences Found</h3>
+                  <h3 className="text-lg font-bold text-white">No Interview Experiences Yet</h3>
                   <p className="text-sm text-slate-400 leading-relaxed font-light max-w-xs mx-auto">
-                    Be the first to share your interview experience and help thousands of students prepare better.
+                    Be the first to share your interview experience and help the PrepSphere community.
                   </p>
                 </div>
                 <button
@@ -660,11 +801,16 @@ const InterviewExperiences = () => {
                     <div>
                       <select
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
+                        onChange={(e) => {
+                          setSortBy(e.target.value);
+                          setCurrentPage(1);
+                        }}
                         className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60"
                       >
                         <option value="Latest">Latest</option>
-                        <option value="Most Liked">Most Liked</option>
+                        <option value="Oldest">Oldest</option>
+                        <option value="Highest Package">Highest Package</option>
+                        <option value="Lowest Package">Lowest Package</option>
                       </select>
                     </div>
                   </div>
@@ -678,28 +824,38 @@ const InterviewExperiences = () => {
                   </h3>
                   
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
-                    {FEATURED_COMPANIES.map((company, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 flex flex-col justify-between hover:border-indigo-500/25 transition-all cursor-pointer relative group h-[130px] shadow-sm hover:scale-[1.02]"
-                      >
-                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent" />
-                        <div className="flex justify-between items-center">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${company.logoColor}`}>
-                            {company.name.charAt(0)}
+                    {loadingMeta ? (
+                      [1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 h-[130px] animate-pulse" />
+                      ))
+                    ) : (
+                      featuredCompanies.map((company, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setFilterCompany(company.name);
+                            setCurrentPage(1);
+                          }}
+                          className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 flex flex-col justify-between hover:border-indigo-500/25 transition-all cursor-pointer relative group h-[130px] shadow-sm hover:scale-[1.02]"
+                        >
+                          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent" />
+                          <div className="flex justify-between items-center">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${company.logoColor}`}>
+                              {company.name.charAt(0)}
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-500 uppercase font-mono">{company.difficulty}</span>
                           </div>
-                          <span className="text-[9px] font-bold text-slate-500 uppercase font-mono">{company.difficulty}</span>
+                          <div className="mt-3">
+                            <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{company.name}</h4>
+                            <span className="text-[10px] text-slate-400 font-light mt-0.5 block">{company.count}</span>
+                          </div>
+                          <div className="border-t border-white/5 pt-1.5 mt-1 flex justify-between text-[9px] font-mono text-slate-400">
+                            <span>Avg Package</span>
+                            <span className="font-bold text-indigo-400">{company.package}</span>
+                          </div>
                         </div>
-                        <div className="mt-3">
-                          <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{company.name}</h4>
-                          <span className="text-[10px] text-slate-400 font-light mt-0.5 block">{company.count}</span>
-                        </div>
-                        <div className="border-t border-white/5 pt-1.5 mt-1 flex justify-between text-[9px] font-mono text-slate-400">
-                          <span>Avg Package</span>
-                          <span className="font-bold text-indigo-400">{company.package}</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </section>
 
@@ -710,10 +866,25 @@ const InterviewExperiences = () => {
                   <div className="lg:col-span-8 space-y-6">
                     <h3 className="text-base font-semibold text-white text-left flex items-center gap-2">
                       <Compass className="w-5 h-5 text-purple-400" />
-                      Interview Experience Feed ({filteredExperiences.length})
-                    </h3>
-
-                    {filteredExperiences.length === 0 ? (
+                      Interview Experience Feed ({totalResults})
+                    </h3>                    {error ? (
+                      <div className="flex flex-col items-center justify-center p-12 bg-red-500/5 border border-red-500/10 rounded-3xl text-center space-y-4">
+                        <p className="text-sm text-red-400 font-medium">{error}</p>
+                        <button
+                          onClick={fetchFeed}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 border border-white/10 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Retry Loading
+                        </button>
+                      </div>
+                    ) : loadingFeed ? (
+                      <div className="space-y-6">
+                        <ExperienceSkeleton />
+                        <ExperienceSkeleton />
+                        <ExperienceSkeleton />
+                      </div>
+                    ) : filteredExperiences.length === 0 ? (
                       <div className="p-12 text-center bg-white/[0.02] border border-white/10 rounded-3xl text-slate-500 font-medium">
                         No interview experiences match the active query.
                       </div>
@@ -723,12 +894,25 @@ const InterviewExperiences = () => {
                         if (exp.difficulty === "Medium") diffColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
                         if (exp.difficulty === "Hard") diffColor = "text-red-400 bg-red-500/10 border-red-500/20";
 
-                        const isLiked = likedList.has(exp.id);
-                        const isBookmarked = bookmarkedList.has(exp.id);
+                        const isLiked = likedList.has(exp._id);
+                        const isBookmarked = bookmarkedList.has(exp._id);
+
+                        const authorName = exp.user?.name || "PrepSphere Contributor";
+                        const authorCollege = exp.user?.college || exp.college || "PrepSphere College";
+                        const authorAvatar = exp.user?.name ? exp.user.name.charAt(0).toUpperCase() : "U";
+                        const formattedDate = new Date(exp.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric"
+                        });
+                        const packageText = exp.package ? `${exp.package} LPA` : "N/A";
+                        const previewText = exp.overallExperience
+                          ? exp.overallExperience.substring(0, 240) + (exp.overallExperience.length > 240 ? "..." : "")
+                          : "";
 
                         return (
                           <div
-                            key={exp.id}
+                            key={exp._id}
                             className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-md hover:border-purple-500/20 transition-all flex flex-col justify-between h-auto gap-4"
                           >
                             <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
@@ -737,18 +921,18 @@ const InterviewExperiences = () => {
                             <div className="flex justify-between items-center border-b border-white/5 pb-3">
                               <div className="flex items-center space-x-3">
                                 <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-300 flex items-center justify-center font-bold text-sm">
-                                  {exp.authorAvatar}
+                                  {authorAvatar}
                                 </div>
                                 <div>
-                                  <h4 className="text-xs sm:text-sm font-bold text-white">{exp.authorName}</h4>
-                                  <span className="text-[10px] text-slate-400 font-mono">{exp.authorCollege} &bull; {exp.date}</span>
+                                  <h4 className="text-xs sm:text-sm font-bold text-white">{authorName}</h4>
+                                  <span className="text-[10px] text-slate-400 font-mono">{authorCollege} &bull; {formattedDate}</span>
                                 </div>
                               </div>
 
                               <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                                exp.verdict === "Selected" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/25" : "text-slate-400 bg-slate-800"
+                                exp.result === "Selected" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/25" : "text-slate-400 bg-slate-800"
                               }`}>
-                                {exp.verdict}
+                                {exp.result}
                               </span>
                             </div>
 
@@ -761,50 +945,52 @@ const InterviewExperiences = () => {
                                 <span>&bull;</span>
                                 <span>{exp.role}</span>
                                 <span>&bull;</span>
-                                <span className="text-indigo-400">{exp.package}</span>
-                                <span className="ml-auto text-slate-500 font-mono text-[9px]">{exp.readingTime}</span>
+                                <span className="text-indigo-400">{packageText}</span>
+                                <span className={`ml-auto font-mono text-[9px] px-1.5 py-0.5 rounded border ${diffColor}`}>{exp.difficulty}</span>
                               </div>
 
                               <h3 className="text-base sm:text-lg font-black text-white leading-snug">
-                                {exp.title}
+                                {exp.company} {exp.role} Interview Experience
                               </h3>
                               
-                              <p className="text-xs sm:text-sm text-slate-300 font-light leading-relaxed truncate max-w-2xl">
-                                {exp.summary}
+                              <p className="text-xs sm:text-sm text-slate-300 font-light leading-relaxed">
+                                {previewText}
                               </p>
                             </div>
 
                             {/* Tags cloud */}
-                            <div className="flex flex-wrap gap-1.5 pt-1">
-                              {exp.tags.map((tag, idx) => (
-                                <span key={idx} className="bg-white/5 border border-white/10 text-slate-300 rounded-lg px-2.5 py-0.5 text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
+                            {exp.tags && exp.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                {exp.tags.map((tag, idx) => (
+                                  <span key={idx} className="bg-white/5 border border-white/10 text-slate-300 rounded-lg px-2.5 py-0.5 text-[10px]">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
 
                             {/* Bottom action row */}
                             <div className="border-t border-white/5 pt-4 mt-2 flex flex-wrap gap-4 items-center text-xs">
                               {/* Like button */}
                               <button
-                                onClick={(e) => handleLike(exp.id, e)}
+                                onClick={(e) => handleLike(exp._id, e)}
                                 className={`flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer ${
                                   isLiked ? "text-red-400" : "text-slate-400"
                                 }`}
                               >
                                 <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
-                                <span>{exp.likes}</span>
+                                <span>{(exp.likes || 0) + (isLiked ? 1 : 0)}</span>
                               </button>
 
                               {/* Comment indicator */}
                               <div className="flex items-center gap-1.5 text-slate-400">
                                 <MessageSquare className="w-4 h-4" />
-                                <span>{exp.commentsCount}</span>
+                                <span>0</span>
                               </div>
 
                               {/* Bookmark Toggle */}
                               <button
-                                onClick={(e) => handleBookmark(exp.id, e)}
+                                onClick={(e) => handleBookmark(exp._id, e)}
                                 className={`p-1 rounded hover:text-white cursor-pointer ${
                                   isBookmarked ? "text-indigo-400" : "text-slate-400"
                                 }`}
@@ -814,10 +1000,7 @@ const InterviewExperiences = () => {
                               </button>
 
                               <button
-                                onClick={() => {
-                                  setSelectedExperience(exp);
-                                  setModalOpen(true);
-                                }}
+                                onClick={() => handleSelectExperience(exp)}
                                 className="ml-auto flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-bold transition-colors cursor-pointer focus:outline-none"
                               >
                                 Read More
@@ -828,6 +1011,29 @@ const InterviewExperiences = () => {
                           </div>
                         );
                       })
+                    )}
+
+                    {/* PAGINATION CONTROLS */}
+                    {!loadingFeed && totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-3 mt-8">
+                        <button
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="p-2 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-white/[0.02] text-slate-300 hover:text-white transition-all cursor-pointer focus:outline-none"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-xs text-slate-400 font-medium">
+                          Page <strong className="text-white font-semibold">{currentPage}</strong> of <strong className="text-white font-semibold">{totalPages}</strong>
+                        </span>
+                        <button
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className="p-2 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-white/[0.02] text-slate-300 hover:text-white transition-all cursor-pointer focus:outline-none"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -843,7 +1049,7 @@ const InterviewExperiences = () => {
                       </h3>
                       
                       <div className="grid grid-cols-2 gap-4">
-                        {STATISTICS.map((stat, idx) => (
+                        {communityStats.map((stat, idx) => (
                           <div key={idx} className="p-3 bg-white/[0.01] border border-white/5 rounded-xl">
                             <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">
                               {stat.label}

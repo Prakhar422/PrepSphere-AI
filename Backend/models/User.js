@@ -43,6 +43,38 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    degree: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    graduationYear: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    branch: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    bio: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    profileImage: {
+      type: String,
+      default: '',
+    },
+    profileImagePublicId: {
+      type: String,
+      default: '',
+    },
+    jwtVersion: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

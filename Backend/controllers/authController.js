@@ -2,12 +2,12 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
 // Helper function to generate JWT
-const generateToken = (id) => {
+export const generateToken = (id, jwtVersion = 0) => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('JWT_SECRET environment variable is not defined.');
   }
-  return jwt.sign({ id }, secret, {
+  return jwt.sign({ id, jwtVersion }, secret, {
     expiresIn: '7d',
   });
 };
@@ -64,7 +64,7 @@ export const registerUser = async (req, res) => {
     });
 
     if (user) {
-      const token = generateToken(user._id);
+      const token = generateToken(user._id, user.jwtVersion || 0);
 
       // Return user without password
       const userObj = user.toObject();
@@ -114,7 +114,7 @@ export const loginUser = async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password',
+        message: 'Account not found.',
       });
     }
 
@@ -134,7 +134,7 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.jwtVersion || 0);
 
     // Return user details without password field
     const userObj = user.toObject();
@@ -280,7 +280,7 @@ export const googleAuthCallback = async (req, res) => {
     }
 
     // Generate JWT
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.jwtVersion || 0);
 
     // Redirect to frontend callback page
     res.redirect(`${clientUrl}/oauth-success?token=${token}`);
@@ -414,7 +414,7 @@ export const githubAuthCallback = async (req, res) => {
     }
 
     // Generate JWT
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.jwtVersion || 0);
 
     // Redirect to frontend callback page
     res.redirect(`${clientUrl}/oauth-success?token=${token}`);

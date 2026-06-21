@@ -26,6 +26,16 @@ export const protect = async (req, res, next) => {
         });
       }
 
+      // Check if jwtVersion matches
+      const tokenJwtVersion = decoded.jwtVersion || 0;
+      const userJwtVersion = req.user.jwtVersion || 0;
+      if (tokenJwtVersion !== userJwtVersion) {
+        return res.status(401).json({
+          success: false,
+          message: 'Not authorized, session invalidated (logged out everywhere)',
+        });
+      }
+
       next();
     } catch (error) {
       console.error('Auth middleware error:', error.message);

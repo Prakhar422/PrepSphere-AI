@@ -7,6 +7,16 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const setAuthUser = (userData) => {
+    if (userData && userData.profileImage) {
+      if (!userData.profileImage.includes('v=')) {
+        const separator = userData.profileImage.includes('?') ? '&' : '?';
+        userData.profileImage = `${userData.profileImage}${separator}v=${Date.now()}`;
+      }
+    }
+    setUser(userData);
+  };
+
   // Auto-restoration on startup
   useEffect(() => {
     const restoreUser = async () => {
@@ -20,7 +30,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const response = await api.get('/auth/me');
         if (response.data && response.data.success) {
-          setUser(response.data.user);
+          setAuthUser(response.data.user);
         } else {
           // If response not successful, clear token
           logout();
@@ -38,7 +48,7 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for unauthorized events from the api service
     const handleUnauthorized = () => {
-      setUser(null);
+      setAuthUser(null);
     };
 
     window.addEventListener('auth-unauthorized', handleUnauthorized);
@@ -65,7 +75,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('token'); // Keep storage clean
         }
         
-        setUser(userData);
+        setAuthUser(userData);
         setLoading(false);
         return response.data;
       } else {
@@ -106,7 +116,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.get('/auth/me');
       if (response.data && response.data.success) {
-        setUser(response.data.user);
+        setAuthUser(response.data.user);
         setLoading(false);
         return response.data.user;
       } else {
@@ -124,7 +134,11 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
-    setUser(null);
+    setAuthUser(null);
+  };
+
+  const updateUser = (userData) => {
+    setAuthUser(userData);
   };
 
   const value = {
@@ -134,6 +148,7 @@ export const AuthProvider = ({ children }) => {
     register,
     loginWithToken,
     logout,
+    updateUser,
     isAuthenticated: !!user,
   };
 

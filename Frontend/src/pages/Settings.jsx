@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import api from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
+import { generateInterviewReportPDF, generateAccountSummaryPDF } from "../utils/reportPdfGenerator";
 import {
   LayoutDashboard,
   Brain,
@@ -51,29 +53,69 @@ import {
 } from "lucide-react";
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
 
   // Sidebar Layout Responsive Controls
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Success Notification Toast state
-  const [successToast, setSuccessToast] = useState("");
+  // Inline Feedback States
+  const [profileFeedback, setProfileFeedback] = useState({ type: "", message: "" });
+  const [passwordFeedback, setPasswordFeedback] = useState({ type: "", message: "" });
+  const [emailFeedback, setEmailFeedback] = useState({ type: "", message: "" });
+  const [dataExportFeedback, setDataExportFeedback] = useState({ type: "", message: "" });
+  const [dangerZoneFeedback, setDangerZoneFeedback] = useState({ type: "", message: "" });
+
+  // Additional loading states for export actions
+  const [exportingData, setExportingData] = useState(false);
+  const [exportingReports, setExportingReports] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
+
+  // History delete input matching & loading
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingHistory, setDeletingHistory] = useState(false);
+
+  // Open modal helper clearing other modal states
+  const openModal = (type, target = "") => {
+    setModalType(type);
+    setDeleteTarget(target);
+    setDeleteConfirmText("");
+    setOldPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setNewEmail("");
+    setValidationErrors({});
+    setPasswordFeedback({ type: "", message: "" });
+    setEmailFeedback({ type: "", message: "" });
+    setDangerZoneFeedback({ type: "", message: "" });
+  };
+
 
   // Appearance preferences state
   const [accentColor, setAccentColor] = useState("purple"); // 'purple' | 'blue' | 'cyan' | 'emerald'
   const [density, setDensity] = useState("comfortable"); // 'comfortable' | 'compact'
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
 
+  // Loading States
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [loggingOutEverywhere, setLoggingOutEverywhere] = useState(false);
+
+  // Validation Error States
+  const [validationErrors, setValidationErrors] = useState({});
+
   // Profile data state (defaults to auth context data if available)
   const [name, setName] = useState(user?.name || "Prakhar Sharma");
   const [email, setEmail] = useState(user?.email || "prakhar@prepsphere.ai");
   const [college, setCollege] = useState(user?.college || "BITS Pilani");
-  const [degree, setDegree] = useState("Bachelor of Technology");
-  const [gradYear, setGradYear] = useState("2027");
-  const [branch, setBranch] = useState("Computer Science");
-  const [bio, setBio] = useState("DSA enthusiast, solving hard problems on graphs and learning scalable system architectures.");
-  const [profilePic, setProfilePic] = useState(""); // empty string represents default avatar
+  const [degree, setDegree] = useState("");
+  const [gradYear, setGradYear] = useState("");
+  const [branch, setBranch] = useState("");
+  const [bio, setBio] = useState("");
 
   // Temporary Edit inputs (holds editing state before save)
   const [editName, setEditName] = useState(name);
@@ -82,6 +124,42 @@ const Settings = () => {
   const [editGradYear, setEditGradYear] = useState(gradYear);
   const [editBranch, setEditBranch] = useState(branch);
   const [editBio, setEditBio] = useState(bio);
+
+  const fileInputRef = React.useRef(null);
+
+  // Load Profile details on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await api.get("/settings/profile");
+        if (response.data && response.data.success) {
+          const u = response.data.user;
+          setName(u.name || "");
+          setEmail(u.email || "");
+          setCollege(u.college || "");
+          setDegree(u.degree || "");
+          setGradYear(u.graduationYear || "");
+          setBranch(u.branch || "");
+          setBio(u.bio || "");
+          setHasPassword(u.hasPassword || false);
+          updateUser({ ...user, ...u });
+
+          setEditName(u.name || "");
+          setEditCollege(u.college || "");
+          setEditDegree(u.degree || "");
+          setEditGradYear(u.graduationYear || "");
+          setEditBranch(u.branch || "");
+          setEditBio(u.bio || "");
+        }
+      } catch (error) {
+        console.error("Failed to load profile:", error);
+        setProfileFeedback({ type: "error", message: "Failed to load profile settings." });
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   // Connected accounts state toggles (Google, GitHub linked by default)
   const [googleConnected, setGoogleConnected] = useState(true);
@@ -143,28 +221,69 @@ const Settings = () => {
 
 
 
-  // Trigger Toast Notification
-  const triggerToast = (msg) => {
-    setSuccessToast(msg);
-    setTimeout(() => setSuccessToast(""), 3000);
-  };
-
   // Profile save updates
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setName(editName);
-    setCollege(editCollege);
-    setDegree(editDegree);
-    setGradYear(editGradYear);
-    setBranch(editBranch);
-    setBio(editBio);
-    
-    // Simulating updates saved in context/store
-    if (user) {
-      user.name = editName;
-      user.college = editCollege;
+    setValidationErrors({});
+    setProfileFeedback({ type: "", message: "" });
+
+    // Validate name
+    if (!editName.trim()) {
+      setValidationErrors(prev => ({ ...prev, name: "Name is required" }));
+      return;
     }
-    triggerToast("Profile changes saved successfully.");
+
+    // Validate college
+    if (!editCollege.trim()) {
+      setValidationErrors(prev => ({ ...prev, college: "College is required" }));
+      return;
+    }
+
+    // Validate branch
+    if (!editBranch.trim()) {
+      setValidationErrors(prev => ({ ...prev, branch: "Branch is required" }));
+      return;
+    }
+
+    // Validate graduation year
+    const gradYearRegex = /^\d{4}$/;
+    const gradYearInt = parseInt(editGradYear.trim(), 10);
+    if (!editGradYear.trim() || !gradYearRegex.test(editGradYear.trim()) || isNaN(gradYearInt) || gradYearInt < 1900 || gradYearInt > 2100) {
+      setValidationErrors(prev => ({ ...prev, gradYear: "Graduation year must be a 4-digit year between 1900 and 2100" }));
+      return;
+    }
+
+    setSavingProfile(true);
+
+    try {
+      const response = await api.put("/settings/profile", {
+        name: editName.trim(),
+        college: editCollege.trim(),
+        degree: editDegree.trim(),
+        graduationYear: editGradYear.trim(),
+        branch: editBranch.trim(),
+        bio: editBio.trim()
+      });
+
+      if (response.data && response.data.success) {
+        const u = response.data.user;
+        setName(u.name);
+        setCollege(u.college);
+        setDegree(u.degree);
+        setGradYear(u.graduationYear);
+        setBranch(u.branch);
+        setBio(u.bio);
+
+        updateUser({ ...user, ...u });
+        setProfileFeedback({ type: "success", message: "Profile Updated Successfully" });
+      }
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+      const errMsg = error.response?.data?.message || "Failed to save changes. Network Error.";
+      setProfileFeedback({ type: "error", message: errMsg });
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleCancelProfile = () => {
@@ -174,47 +293,341 @@ const Settings = () => {
     setEditGradYear(gradYear);
     setEditBranch(branch);
     setEditBio(bio);
-    triggerToast("Profile edit discarded.");
+    setValidationErrors({});
+    setProfileFeedback({ type: "success", message: "Profile edit discarded." });
   };
 
   // Connected accounts count check
   const connectedCount = [googleConnected, githubConnected, linkedinConnected, leetcodeConnected, gfgConnected, codeforcesConnected].filter(Boolean).length;
 
-  const handlePasswordSubmit = (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      alert("Please fill all password fields.");
+    setValidationErrors({});
+    setPasswordFeedback({ type: "", message: "" });
+
+    if (!oldPassword) {
+      setValidationErrors(prev => ({ ...prev, oldPassword: "Current password is required" }));
       return;
     }
+
+    if (!newPassword || newPassword.length < 8) {
+      setValidationErrors(prev => ({ ...prev, newPassword: "New password must be at least 8 characters long" }));
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
-      alert("New passwords do not match.");
+      setValidationErrors(prev => ({ ...prev, confirmPassword: "Passwords do not match" }));
       return;
     }
-    setOldPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setModalType("none");
-    triggerToast("Password updated securely.");
+
+    setChangingPassword(true);
+
+    try {
+      const response = await api.put("/settings/change-password", {
+        oldPassword,
+        newPassword,
+        confirmPassword
+      });
+
+      if (response.data && response.data.success) {
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setPasswordFeedback({ type: "success", message: "Password Changed Successfully" });
+        setTimeout(() => {
+          setModalType("none");
+          setPasswordFeedback({ type: "", message: "" });
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Failed to change password:", error);
+      const errMsg = error.response?.data?.message || "Password change failed. Network Error.";
+      setPasswordFeedback({ type: "error", message: errMsg });
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
-  const handleEmailSubmit = (e) => {
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
-    if (!newEmail) return;
-    setEmail(newEmail);
-    setNewEmail("");
-    setModalType("none");
-    triggerToast(`Verification link sent to: ${newEmail}`);
+    setValidationErrors({});
+    setEmailFeedback({ type: "", message: "" });
+
+    if (!newEmail.trim()) {
+      setValidationErrors(prev => ({ ...prev, newEmail: "New email address is required" }));
+      return;
+    }
+
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(newEmail.trim())) {
+      setValidationErrors(prev => ({ ...prev, newEmail: "Please enter a valid email address" }));
+      return;
+    }
+
+    if (!oldPassword) {
+      setValidationErrors(prev => ({ ...prev, oldPasswordEmail: "Current password is required" }));
+      return;
+    }
+
+    setChangingEmail(true);
+
+    try {
+      const response = await api.put("/settings/change-email", {
+        password: oldPassword,
+        newEmail: newEmail.trim()
+      });
+
+      if (response.data && response.data.success) {
+        setEmail(response.data.user.email);
+        setNewEmail("");
+        setOldPassword("");
+
+        // Update local session token
+        const token = response.data.token;
+        if (localStorage.getItem('token')) {
+          localStorage.setItem('token', token);
+        } else {
+          sessionStorage.setItem('token', token);
+        }
+
+        updateUser({ ...user, ...response.data.user });
+        setEmailFeedback({ type: "success", message: "Email Updated Successfully" });
+        setTimeout(() => {
+          setModalType("none");
+          setEmailFeedback({ type: "", message: "" });
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Failed to change email:", error);
+      const errMsg = error.response?.data?.message || "Email update failed. Network Error.";
+      setEmailFeedback({ type: "error", message: errMsg });
+    } finally {
+      setChangingEmail(false);
+    }
   };
 
-  const handleDeleteHistory = () => {
-    setModalType("none");
-    triggerToast(`${deleteTarget} history deleted successfully.`);
+  const handleLogoutEverywhere = async () => {
+    setLoggingOutEverywhere(true);
+    setPasswordFeedback({ type: "", message: "" });
+    try {
+      const response = await api.post("/settings/logout-all");
+      if (response.data && response.data.success) {
+        logout();
+        navigate("/login");
+      }
+    } catch (error) {
+      console.error("Failed to logout everywhere:", error);
+      const errMsg = error.response?.data?.message || "Logout everywhere failed. Network Error.";
+      setPasswordFeedback({ type: "error", message: errMsg });
+    } finally {
+      setLoggingOutEverywhere(false);
+    }
   };
 
-  const handleDeleteAccount = () => {
-    setModalType("none");
-    logout();
-    navigate("/login");
+  const handleRemovePhoto = async () => {
+    setUploadingPhoto(true);
+    setProfileFeedback({ type: "", message: "" });
+    try {
+      const response = await api.delete('/settings/profile-photo');
+      if (response.data && response.data.success) {
+        const u = response.data.user;
+        updateUser({ ...user, ...u });
+        setProfileFeedback({ type: "success", message: "Profile photo removed successfully." });
+      }
+    } catch (error) {
+      console.error("Failed to remove photo:", error);
+      const errMsg = error.response?.data?.message || "Failed to remove photo. Network Error.";
+      setProfileFeedback({ type: "error", message: errMsg });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleEditPhotoClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setProfileFeedback({ type: "", message: "" });
+
+    // Validate size and extension
+    const allowedExtensions = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedExtensions.includes(file.type)) {
+      setProfileFeedback({ type: "error", message: "Unsupported file type. Select JPG, JPEG, PNG or WEBP." });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileFeedback({ type: "error", message: "File size must be less than 5 MB." });
+      return;
+    }
+
+    setUploadingPhoto(true);
+    const formData = new FormData();
+    formData.append('profileImage', file);
+
+    try {
+      const response = await api.put('/settings/profile-photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data && response.data.success) {
+        const u = response.data.user;
+        updateUser({ ...user, ...u });
+        setProfileFeedback({ type: "success", message: "Profile photo uploaded successfully." });
+      }
+    } catch (error) {
+      console.error("Photo upload failed:", error);
+      const errMsg = error.response?.data?.message || "Profile photo upload failed.";
+      setProfileFeedback({ type: "error", message: errMsg });
+    } finally {
+      setUploadingPhoto(false);
+      // Reset input
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleExportData = async () => {
+    setExportingData(true);
+    setDataExportFeedback({ type: "", message: "" });
+    try {
+      const response = await api.get("/settings/export-data");
+      
+      // Trigger new PDF account summary generator
+      await generateAccountSummaryPDF(response.data, user, { autoSave: true });
+      
+      setDataExportFeedback({ type: "success", message: "Account Summary PDF downloaded successfully." });
+    } catch (error) {
+      console.error("Export data failed:", error);
+      const errMsg = error.response?.data?.message || "Data export failed. Network Error.";
+      setDataExportFeedback({ type: "error", message: errMsg });
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  const handleExportReports = async () => {
+    setExportingReports(true);
+    setDataExportFeedback({ type: "", message: "" });
+    try {
+      const response = await api.get("/settings/export-reports");
+      const report = response.data.report;
+      
+      if (!report) {
+        setDataExportFeedback({ type: "error", message: "No interview report available." });
+        return;
+      }
+
+      generateInterviewReportPDF(report, user, { autoSave: true });
+      setDataExportFeedback({ type: "success", message: "Report PDF downloaded successfully." });
+    } catch (error) {
+      console.error("Export reports failed:", error);
+      const errMsg = error.response?.data?.message || error.message || "Reports export failed. Network Error.";
+      setDataExportFeedback({ type: "error", message: errMsg });
+    } finally {
+      setExportingReports(false);
+    }
+  };
+
+  const handleDeleteHistory = async () => {
+    if (deleteConfirmText !== "DELETE") return;
+    setDeletingHistory(true);
+    setDangerZoneFeedback({ type: "", message: "" });
+
+    let endpoint = "";
+    if (deleteTarget === "Resume Analyzer") {
+      endpoint = "/settings/history/resume";
+    } else if (deleteTarget === "Aptitude Practice") {
+      endpoint = "/settings/history/aptitude";
+    } else if (deleteTarget === "Mock Interview") {
+      endpoint = "/settings/history/interviews";
+    }
+
+    if (!endpoint) {
+      setDangerZoneFeedback({ type: "error", message: "Invalid history deletion target." });
+      setDeletingHistory(false);
+      return;
+    }
+
+    try {
+      const response = await api.delete(endpoint);
+      if (response.data && response.data.success) {
+        window.dispatchEvent(new Event('dashboard-refresh'));
+        setDangerZoneFeedback({
+          type: "success",
+          message: `${deleteTarget} history deleted successfully. Dashboard metrics updated.`
+        });
+        setTimeout(() => {
+          setModalType("none");
+          setDeleteConfirmText("");
+          setDangerZoneFeedback({ type: "", message: "" });
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Failed to delete history:", error);
+      const errMsg = error.response?.data?.message || "History deletion failed. Network Error.";
+      setDangerZoneFeedback({ type: "error", message: errMsg });
+    } finally {
+      setDeletingHistory(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE") return;
+    if (hasPassword && !oldPassword) {
+      setValidationErrors({ deletePassword: "Password is required" });
+      return;
+    }
+
+    setDeletingAccount(true);
+    setDangerZoneFeedback({ type: "", message: "" });
+    setValidationErrors({});
+
+    try {
+      await api.delete("/settings/delete-account", {
+        data: { password: oldPassword }
+      });
+
+      // Clear local states & sessions
+      logout();
+      localStorage.clear();
+      sessionStorage.clear();
+      // Remove any cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+
+      // Show success inline & close modal after a short delay
+      setDangerZoneFeedback({ type: "success", message: "Account deleted successfully. Redirecting..." });
+      
+      // Dispatch refresh events to clear other states
+      window.dispatchEvent(new Event("dashboard-refresh"));
+
+      setTimeout(() => {
+        setModalType("none");
+        navigate("/login");
+      }, 2000);
+
+    } catch (error) {
+      console.error("Account deletion failed:", error);
+      const errMsg = error.response?.data?.message || "Account deletion failed. Network Error.";
+      
+      if (errMsg.toLowerCase().includes("password")) {
+        setValidationErrors({ deletePassword: errMsg });
+      } else {
+        setDangerZoneFeedback({ type: "error", message: errMsg });
+      }
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   const handleLogout = () => {
@@ -264,9 +677,6 @@ const Settings = () => {
           
           <TopNavbar
             onMenuClick={() => setSidebarOpen(true)}
-            userName={name}
-            userCollege={college}
-            profilePic={profilePic}
           />
 
           {/* MAIN SETTINGS PAGE CONTENT */}
@@ -312,8 +722,12 @@ const Settings = () => {
                     <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-white/5">
                       <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[1.5px] relative group overflow-hidden shadow-lg shrink-0">
                         <div className="w-full h-full rounded-3xl bg-[#080E24] flex items-center justify-center text-indigo-400 text-3xl font-extrabold transition-all group-hover:scale-105 duration-300">
-                          {profilePic ? (
-                            <img src={profilePic} alt="Avatar" className="w-full h-full rounded-3xl object-cover" />
+                          {loadingProfile || uploadingPhoto ? (
+                            <div className="w-full h-full rounded-3xl bg-slate-800 animate-pulse flex items-center justify-center">
+                              <RefreshCw className="w-6 h-6 text-indigo-400 animate-spin" />
+                            </div>
+                          ) : user?.profileImage ? (
+                            <img src={user.profileImage} alt="Avatar" className="w-full h-full rounded-3xl object-cover" />
                           ) : (
                             name.charAt(0).toUpperCase()
                           )}
@@ -323,28 +737,30 @@ const Settings = () => {
                       <div className="space-y-2 text-center sm:text-left">
                         <h4 className="text-sm font-bold text-white">Profile Photo</h4>
                         <p className="text-xs text-slate-400 font-light max-w-xs">
-                          Upload a professional image. Recommended size 400x400px. JPG or PNG.
+                          Upload a professional image. Recommended size 400x400px. JPG, JPEG, PNG or WEBP.
                         </p>
                         <div className="flex flex-wrap gap-2.5 justify-center sm:justify-start">
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            style={{ display: "none" }}
+                            accept="image/png, image/jpeg, image/jpg, image/webp"
+                          />
                           <button
                             type="button"
-                            onClick={() => {
-                              // Simulate Photo Upload
-                              setProfilePic("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80");
-                              triggerToast("Profile photo uploaded.");
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-white border border-white/10 hover:bg-white/5 ${colorTheme.glowBorder}`}
+                            onClick={handleEditPhotoClick}
+                            disabled={loadingProfile || uploadingPhoto}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-white border border-white/10 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed ${colorTheme.glowBorder}`}
                           >
-                            Edit Photo
+                            {uploadingPhoto ? "Uploading..." : "Edit Photo"}
                           </button>
-                          {profilePic && (
+                          {user?.profileImage && !loadingProfile && (
                             <button
                               type="button"
-                              onClick={() => {
-                                setProfilePic("");
-                                triggerToast("Photo removed.");
-                              }}
-                              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 transition-all cursor-pointer"
+                              onClick={handleRemovePhoto}
+                              disabled={uploadingPhoto}
+                              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               Remove
                             </button>
@@ -357,78 +773,153 @@ const Settings = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
                       <div className="space-y-1.5">
                         <label className="block font-bold text-slate-400 uppercase tracking-wide">Full Name</label>
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
-                        />
+                        {loadingProfile ? (
+                          <div className="w-full h-[38px] bg-white/5 rounded-xl animate-pulse" />
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => {
+                                setEditName(e.target.value);
+                                if (validationErrors.name) {
+                                  setValidationErrors(prev => ({ ...prev, name: "" }));
+                                }
+                              }}
+                              className={`w-full bg-slate-950/40 border ${validationErrors.name ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60`}
+                            />
+                            {validationErrors.name && (
+                              <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.name}</p>
+                            )}
+                          </>
+                        )}
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="block font-bold text-slate-400 uppercase tracking-wide">College</label>
-                        <input
-                          type="text"
-                          value={editCollege}
-                          onChange={(e) => setEditCollege(e.target.value)}
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
-                        />
+                        {loadingProfile ? (
+                          <div className="w-full h-[38px] bg-white/5 rounded-xl animate-pulse" />
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              value={editCollege}
+                              onChange={(e) => {
+                                setEditCollege(e.target.value);
+                                if (validationErrors.college) {
+                                  setValidationErrors(prev => ({ ...prev, college: "" }));
+                                }
+                              }}
+                              className={`w-full bg-slate-950/40 border ${validationErrors.college ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60`}
+                            />
+                            {validationErrors.college && (
+                              <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.college}</p>
+                            )}
+                          </>
+                        )}
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="block font-bold text-slate-400 uppercase tracking-wide">Degree Qualification</label>
-                        <input
-                          type="text"
-                          value={editDegree}
-                          onChange={(e) => setEditDegree(e.target.value)}
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
-                        />
+                        {loadingProfile ? (
+                          <div className="w-full h-[38px] bg-white/5 rounded-xl animate-pulse" />
+                        ) : (
+                          <input
+                            type="text"
+                            value={editDegree}
+                            onChange={(e) => setEditDegree(e.target.value)}
+                            className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
+                          />
+                        )}
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="block font-bold text-slate-400 uppercase tracking-wide">Graduation Year</label>
-                        <input
-                          type="text"
-                          value={editGradYear}
-                          onChange={(e) => setEditGradYear(e.target.value)}
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
-                        />
+                        {loadingProfile ? (
+                          <div className="w-full h-[38px] bg-white/5 rounded-xl animate-pulse" />
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              value={editGradYear}
+                              onChange={(e) => {
+                                setEditGradYear(e.target.value);
+                                if (validationErrors.gradYear) {
+                                  setValidationErrors(prev => ({ ...prev, gradYear: "" }));
+                                }
+                              }}
+                              className={`w-full bg-slate-950/40 border ${validationErrors.gradYear ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60`}
+                            />
+                            {validationErrors.gradYear && (
+                              <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.gradYear}</p>
+                            )}
+                          </>
+                        )}
                       </div>
 
                       <div className="space-y-1.5 sm:col-span-2">
                         <label className="block font-bold text-slate-400 uppercase tracking-wide">Branch</label>
-                        <input
-                          type="text"
-                          value={editBranch}
-                          onChange={(e) => setEditBranch(e.target.value)}
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
-                        />
+                        {loadingProfile ? (
+                          <div className="w-full h-[38px] bg-white/5 rounded-xl animate-pulse" />
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              value={editBranch}
+                              onChange={(e) => {
+                                setEditBranch(e.target.value);
+                                if (validationErrors.branch) {
+                                  setValidationErrors(prev => ({ ...prev, branch: "" }));
+                                }
+                              }}
+                              className={`w-full bg-slate-950/40 border ${validationErrors.branch ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60`}
+                            />
+                            {validationErrors.branch && (
+                              <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.branch}</p>
+                            )}
+                          </>
+                        )}
                       </div>
 
                       <div className="space-y-1.5 sm:col-span-2">
                         <label className="block font-bold text-slate-400 uppercase tracking-wide">Short Bio</label>
-                        <textarea
-                          value={editBio}
-                          onChange={(e) => setEditBio(e.target.value)}
-                          className="w-full h-24 bg-slate-950/40 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500/60 leading-relaxed"
-                        />
+                        {loadingProfile ? (
+                          <div className="w-full h-[96px] bg-white/5 rounded-xl animate-pulse" />
+                        ) : (
+                          <textarea
+                            value={editBio}
+                            onChange={(e) => setEditBio(e.target.value)}
+                            className="w-full h-24 bg-slate-950/40 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500/60 leading-relaxed"
+                          />
+                        )}
                       </div>
                     </div>
+
+                    {profileFeedback.message && (
+                      <div className="pt-2 text-xs font-bold text-left">
+                        <span className={profileFeedback.type === "success" ? "text-emerald-400" : "text-red-400"}>
+                          {profileFeedback.message}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Bottom Save/Cancel Actions */}
                     <div className="pt-4 border-t border-white/5 flex gap-3 justify-end text-xs font-bold">
                       <button
                         type="button"
                         onClick={handleCancelProfile}
-                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer"
+                        disabled={savingProfile || loadingProfile}
+                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className={`px-6 py-2.5 rounded-xl text-white shadow-lg cursor-pointer ${colorTheme.btnBg}`}
+                        disabled={savingProfile || loadingProfile}
+                        className={`px-6 py-2.5 rounded-xl text-white shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 ${colorTheme.btnBg}`}
                       >
-                        Save Changes
+                        {savingProfile && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                        {savingProfile ? "Saving..." : "Save Changes"}
                       </button>
                     </div>
                   </form>
@@ -474,7 +965,6 @@ const Settings = () => {
                             type="button"
                             onClick={() => {
                               setGoogleConnected(!googleConnected);
-                              triggerToast(googleConnected ? "Google identity disconnected." : "Google linked successfully.");
                             }}
                             className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold transition-all cursor-pointer focus:outline-none"
                           >
@@ -502,7 +992,6 @@ const Settings = () => {
                             type="button"
                             onClick={() => {
                               setGithubConnected(!githubConnected);
-                              triggerToast(githubConnected ? "GitHub OAuth disconnected." : "GitHub linked successfully.");
                             }}
                             className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold transition-all cursor-pointer focus:outline-none"
                           >
@@ -537,10 +1026,7 @@ const Settings = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          setDeleteTarget("Resume Analyzer");
-                          setModalType("delete-history");
-                        }}
+                        onClick={() => openModal("delete-history", "Resume Analyzer")}
                         className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 border border-red-500/25 hover:bg-red-500/10 cursor-pointer transition-colors"
                       >
                         Delete Resume History
@@ -548,7 +1034,6 @@ const Settings = () => {
                     </div>
 
                     {/* Delete Aptitude History */}
-
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 py-3 border-b border-red-500/10 last:border-0 last:pb-0">
                       <div>
                         <span className="block font-bold text-white uppercase tracking-wide">Delete Aptitude History</span>
@@ -556,10 +1041,7 @@ const Settings = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          setDeleteTarget("Aptitude Practice");
-                          setModalType("delete-history");
-                        }}
+                        onClick={() => openModal("delete-history", "Aptitude Practice")}
                         className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 border border-red-500/25 hover:bg-red-500/10 cursor-pointer transition-colors"
                       >
                         Delete Aptitude History
@@ -574,10 +1056,7 @@ const Settings = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          setDeleteTarget("Mock Interview");
-                          setModalType("delete-history");
-                        }}
+                        onClick={() => openModal("delete-history", "Mock Interview")}
                         className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 border border-red-500/25 hover:bg-red-500/10 cursor-pointer transition-colors"
                       >
                         Delete Interview History
@@ -592,7 +1071,7 @@ const Settings = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setModalType("delete-account")}
+                        onClick={() => openModal("delete-account")}
                         className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 shadow-md shadow-red-600/10 cursor-pointer transition-colors"
                       >
                         Delete Account
@@ -626,7 +1105,7 @@ const Settings = () => {
                         <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Update your account password securely.</p>
                       </div>
                       <button
-                        onClick={() => setModalType("password")}
+                        onClick={() => openModal("password")}
                         className="w-full py-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer"
                       >
                         Change Password
@@ -643,7 +1122,7 @@ const Settings = () => {
                         <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Update your registered email address.</p>
                       </div>
                       <button
-                        onClick={() => setModalType("email")}
+                        onClick={() => openModal("email")}
                         className="w-full py-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer"
                       >
                         Change Email
@@ -660,13 +1139,12 @@ const Settings = () => {
                         <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Securely sign out from every logged-in device.</p>
                       </div>
                       <button
-                        onClick={() => {
-                          logout();
-                          navigate("/login");
-                        }}
-                        className="w-full py-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer"
+                        onClick={handleLogoutEverywhere}
+                        disabled={loggingOutEverywhere}
+                        className="w-full py-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                       >
-                        Logout Everywhere
+                        {loggingOutEverywhere && <RefreshCw className="w-3 h-3 animate-spin" />}
+                        {loggingOutEverywhere ? "Signing out everywhere..." : "Logout Everywhere"}
                       </button>
                     </div>
                   </div>
@@ -690,11 +1168,12 @@ const Settings = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => triggerToast("Your data export has started.")}
-                        className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-300 hover:text-white cursor-pointer"
+                        onClick={handleExportData}
+                        disabled={exportingData || exportingReports}
+                        className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-300 hover:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Download Data"
                       >
-                        <Download className="w-4 h-4" />
+                        {exportingData ? <RefreshCw className="w-4 h-4 animate-spin text-purple-400" /> : <Download className="w-4 h-4" />}
                       </button>
                     </div>
 
@@ -706,13 +1185,28 @@ const Settings = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => triggerToast("Interview reports exported.")}
-                        className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-300 hover:text-white cursor-pointer"
+                        onClick={handleExportReports}
+                        disabled={exportingData || exportingReports}
+                        className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-300 hover:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Export Reports"
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        {exportingReports ? <RefreshCw className="w-4 h-4 animate-spin text-purple-400" /> : <ExternalLink className="w-4 h-4" />}
                       </button>
                     </div>
+
+                    {dataExportFeedback.message && (
+                      <div className="pt-2 text-[10px] font-bold text-left">
+                        <span className={
+                          dataExportFeedback.type === "success" 
+                            ? "text-emerald-400" 
+                            : dataExportFeedback.type === "info" 
+                              ? "text-indigo-400" 
+                              : "text-red-400"
+                        }>
+                          {dataExportFeedback.message}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Legal Policies */}
                     <div className="pt-2 flex flex-wrap gap-2 text-[10px] font-bold text-slate-500">
@@ -756,10 +1250,10 @@ const Settings = () => {
                     {/* About Actions Links */}
                     <div className="space-y-2 font-bold">
                       
-                      <button onClick={() => alert("Contact support@prepsphere.ai")} className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer">
+                      <a href="mailto:support@prepsphere.ai?subject=PrepSphere%20Support%20Request&body=Hello%20PrepSphere%20Team%2C%0A%0AI%20need%20assistance%20regarding...%0A%0ARegards%2C" className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer">
                         <span>Contact Support</span>
                         <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      </a>
                     </div>
                   </div>
                 </section>
@@ -770,22 +1264,7 @@ const Settings = () => {
           </main>
         </div>
 
-        {/* TOAST SUCCESS NOTIFICATION BANNER */}
-        <AnimatePresence>
-          {successToast && (
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-emerald-500/30 rounded-2xl px-5 py-3 shadow-[0_0_20px_rgba(16,185,129,0.15)] flex items-center space-x-3 text-left"
-            >
-              <div className="p-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <Check className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-bold text-white">{successToast}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
 
         {/* ACCOUNT MODALS OVERLAYS */}
         <AnimatePresence>
@@ -796,7 +1275,9 @@ const Settings = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setModalType("none")}
+                onClick={() => {
+                  if (!deletingAccount && !deletingHistory) setModalType("none");
+                }}
                 className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
               />
 
@@ -827,9 +1308,15 @@ const Settings = () => {
                           type="password"
                           required
                           value={oldPassword}
-                          onChange={(e) => setOldPassword(e.target.value)}
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
+                          onChange={(e) => {
+                            setOldPassword(e.target.value);
+                            if (validationErrors.oldPassword) setValidationErrors(prev => ({ ...prev, oldPassword: "" }));
+                          }}
+                          className={`w-full bg-slate-950/40 border ${validationErrors.oldPassword ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60`}
                         />
+                        {validationErrors.oldPassword && (
+                          <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.oldPassword}</p>
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <label className="block font-bold text-slate-400 uppercase tracking-wide">New Password</label>
@@ -837,9 +1324,15 @@ const Settings = () => {
                           type="password"
                           required
                           value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
+                          onChange={(e) => {
+                            setNewPassword(e.target.value);
+                            if (validationErrors.newPassword) setValidationErrors(prev => ({ ...prev, newPassword: "" }));
+                          }}
+                          className={`w-full bg-slate-950/40 border ${validationErrors.newPassword ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60`}
                         />
+                        {validationErrors.newPassword && (
+                          <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.newPassword}</p>
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <label className="block font-bold text-slate-400 uppercase tracking-wide">Confirm New Password</label>
@@ -847,25 +1340,45 @@ const Settings = () => {
                           type="password"
                           required
                           value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60"
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            if (validationErrors.confirmPassword) setValidationErrors(prev => ({ ...prev, confirmPassword: "" }));
+                          }}
+                          className={`w-full bg-slate-950/40 border ${validationErrors.confirmPassword ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60`}
                         />
+                        {validationErrors.confirmPassword && (
+                          <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.confirmPassword}</p>
+                        )}
                       </div>
                     </div>
+
+                    {passwordFeedback.message && (
+                      <div className="pt-2 text-xs font-bold text-left">
+                        <span className={passwordFeedback.type === "success" ? "text-emerald-400" : "text-red-400"}>
+                          {passwordFeedback.message}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex space-x-3 pt-4 justify-end font-bold">
                       <button
                         type="button"
-                        onClick={() => setModalType("none")}
-                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer"
+                        onClick={() => {
+                          setModalType("none");
+                          setValidationErrors({});
+                        }}
+                        disabled={changingPassword}
+                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className={`px-5 py-2.5 rounded-xl text-white shadow-lg cursor-pointer ${colorTheme.btnBg}`}
+                        disabled={changingPassword}
+                        className={`px-5 py-2.5 rounded-xl text-white shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 ${colorTheme.btnBg}`}
                       >
-                        Save Password
+                        {changingPassword && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                        {changingPassword ? "Updating..." : "Save Password"}
                       </button>
                     </div>
                   </form>
@@ -898,26 +1411,62 @@ const Settings = () => {
                           type="email"
                           required
                           value={newEmail}
-                          onChange={(e) => setNewEmail(e.target.value)}
+                          onChange={(e) => {
+                            setNewEmail(e.target.value);
+                            if (validationErrors.newEmail) setValidationErrors(prev => ({ ...prev, newEmail: "" }));
+                          }}
                           placeholder="e.g. name@company.com"
-                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60 font-mono"
+                          className={`w-full bg-slate-950/40 border ${validationErrors.newEmail ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60 font-mono`}
                         />
+                        {validationErrors.newEmail && (
+                          <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.newEmail}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block font-bold text-slate-400 uppercase tracking-wide">Current Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={oldPassword}
+                          onChange={(e) => {
+                            setOldPassword(e.target.value);
+                            if (validationErrors.oldPasswordEmail) setValidationErrors(prev => ({ ...prev, oldPasswordEmail: "" }));
+                          }}
+                          className={`w-full bg-slate-950/40 border ${validationErrors.oldPasswordEmail ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500/60`}
+                        />
+                        {validationErrors.oldPasswordEmail && (
+                          <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.oldPasswordEmail}</p>
+                        )}
                       </div>
                     </div>
+
+                    {emailFeedback.message && (
+                      <div className="pt-2 text-xs font-bold text-left">
+                        <span className={emailFeedback.type === "success" ? "text-emerald-400" : "text-red-400"}>
+                          {emailFeedback.message}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex space-x-3 pt-4 justify-end font-bold">
                       <button
                         type="button"
-                        onClick={() => setModalType("none")}
-                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer"
+                        onClick={() => {
+                          setModalType("none");
+                          setValidationErrors({});
+                        }}
+                        disabled={changingEmail}
+                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className={`px-5 py-2.5 rounded-xl text-white shadow-lg cursor-pointer ${colorTheme.btnBg}`}
+                        disabled={changingEmail}
+                        className={`px-5 py-2.5 rounded-xl text-white shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 ${colorTheme.btnBg}`}
                       >
-                        Send Verification
+                        {changingEmail && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                        {changingEmail ? "Updating..." : "Update Email"}
                       </button>
                     </div>
                   </form>
@@ -940,20 +1489,48 @@ const Settings = () => {
                       </div>
                     </div>
 
+                    <div className="space-y-2 mt-4">
+                      <label className="block text-slate-400 font-bold uppercase tracking-wide">
+                        Type <span className="text-red-400 font-mono">DELETE</span> to confirm
+                      </label>
+                      <input
+                        type="text"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="Type DELETE"
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-red-500/60 font-mono text-center"
+                      />
+                    </div>
+
+                    {dangerZoneFeedback.message && (
+                      <div className="pt-2 text-xs font-bold text-left">
+                        <span className={dangerZoneFeedback.type === "success" ? "text-emerald-400" : "text-red-400"}>
+                          {dangerZoneFeedback.message}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex space-x-3 pt-4 justify-end font-bold">
                       <button
                         type="button"
-                        onClick={() => setModalType("none")}
-                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer"
+                        onClick={() => {
+                          setModalType("none");
+                          setDeleteConfirmText("");
+                          setDangerZoneFeedback({ type: "", message: "" });
+                        }}
+                        disabled={deletingHistory}
+                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
                         onClick={handleDeleteHistory}
-                        className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/15 cursor-pointer transition-colors"
+                        disabled={deleteConfirmText !== "DELETE" || deletingHistory}
+                        className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-red-900/50 disabled:text-slate-500 text-white shadow-md shadow-red-600/15 cursor-pointer disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
                       >
-                        Delete History Data
+                        {deletingHistory && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                        {deletingHistory ? "Deleting..." : "Delete History Data"}
                       </button>
                     </div>
                   </div>
@@ -976,20 +1553,75 @@ const Settings = () => {
                       </div>
                     </div>
 
+                    <div className="space-y-2 mt-4">
+                      <label className="block text-slate-400 font-bold uppercase tracking-wide">
+                        Type <span className="text-red-400 font-mono">DELETE</span> to confirm
+                      </label>
+                      <input
+                        type="text"
+                        disabled={deletingAccount}
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="Type DELETE"
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-red-500/60 font-mono text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </div>
+
+                    {hasPassword && (
+                      <div className="space-y-2">
+                        <label className="block text-slate-400 font-bold uppercase tracking-wide">
+                          Confirm Current Password
+                        </label>
+                        <input
+                          type="password"
+                          disabled={deletingAccount}
+                          value={oldPassword}
+                          onChange={(e) => {
+                            setOldPassword(e.target.value);
+                            if (validationErrors.deletePassword) {
+                              setValidationErrors(prev => ({ ...prev, deletePassword: "" }));
+                            }
+                          }}
+                          placeholder="Enter your password"
+                          className={`w-full bg-slate-950/60 border ${validationErrors.deletePassword ? 'border-red-500' : 'border-white/10'} rounded-xl px-3 py-2 text-white focus:outline-none focus:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed`}
+                        />
+                        {validationErrors.deletePassword && (
+                          <p className="text-red-500 text-[10px] mt-1 font-semibold">{validationErrors.deletePassword}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {dangerZoneFeedback.message && (
+                      <div className="pt-2 text-xs font-bold text-left">
+                        <span className={dangerZoneFeedback.type === "success" ? "text-emerald-400" : "text-red-400"}>
+                          {dangerZoneFeedback.message}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex space-x-3 pt-4 justify-end font-bold">
                       <button
                         type="button"
-                        onClick={() => setModalType("none")}
-                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer"
+                        onClick={() => {
+                          setModalType("none");
+                          setDeleteConfirmText("");
+                          setOldPassword("");
+                          setDangerZoneFeedback({ type: "", message: "" });
+                          setValidationErrors({});
+                        }}
+                        disabled={deletingAccount}
+                        className="px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
                         onClick={handleDeleteAccount}
-                        className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/25 cursor-pointer transition-colors"
+                        disabled={deleteConfirmText !== "DELETE" || (hasPassword && !oldPassword) || deletingAccount}
+                        className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-red-900/50 disabled:text-slate-500 text-white shadow-md shadow-red-600/15 cursor-pointer disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
                       >
-                        Confirm Account Deletion
+                        {deletingAccount && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                        {deletingAccount ? "Deleting..." : "Confirm Account Deletion"}
                       </button>
                     </div>
                   </div>
