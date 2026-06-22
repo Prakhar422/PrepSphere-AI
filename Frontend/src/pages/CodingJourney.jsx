@@ -32,7 +32,7 @@ import {
   RefreshCw,
   ExternalLink,
   ChevronDown,
-  Info
+  Info,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -47,7 +47,7 @@ import {
   Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
 } from "recharts";
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
@@ -98,9 +98,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/two-sum/",
     lastSolved: "2026-06-18T10:00:00Z",
     revisionCount: 2,
-    notes: "Utilize a Hash Map to find the complement of each element in O(1) time. O(N) space complexity.",
+    notes:
+      "Utilize a Hash Map to find the complement of each element in O(1) time. O(N) space complexity.",
     bookmarked: true,
-    favorite: true
+    favorite: true,
   },
   {
     id: "prob-2",
@@ -113,9 +114,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/reverse-linked-list/",
     lastSolved: "2026-06-19T09:15:00Z",
     revisionCount: 3,
-    notes: "Iterative approach with prev, curr, and next pointers. Recursion is also possible.",
+    notes:
+      "Iterative approach with prev, curr, and next pointers. Recursion is also possible.",
     bookmarked: false,
-    favorite: true
+    favorite: true,
   },
   {
     id: "prob-3",
@@ -128,9 +130,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/3sum/",
     lastSolved: "2026-06-17T15:30:00Z",
     revisionCount: 1,
-    notes: "Sort first, then use a two-pointer approach. Remember to skip duplicate values to avoid duplicate triplets.",
+    notes:
+      "Sort first, then use a two-pointer approach. Remember to skip duplicate values to avoid duplicate triplets.",
     bookmarked: true,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-4",
@@ -143,9 +146,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/validate-binary-search-tree/",
     lastSolved: "2026-06-15T11:45:00Z",
     revisionCount: 2,
-    notes: "Recursively pass down low and high constraints. Left child range: (low, parent.val), Right child: (parent.val, high).",
+    notes:
+      "Recursively pass down low and high constraints. Left child range: (low, parent.val), Right child: (parent.val, high).",
     bookmarked: false,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-5",
@@ -158,9 +162,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/edit-distance/",
     lastSolved: null,
     revisionCount: 0,
-    notes: "Classical 2D Dynamic Programming problem. DP[i][j] represents edits required for word1[0...i] to word2[0...j].",
+    notes:
+      "Classical 2D Dynamic Programming problem. DP[i][j] represents edits required for word1[0...i] to word2[0...j].",
     bookmarked: true,
-    favorite: true
+    favorite: true,
   },
   {
     id: "prob-6",
@@ -173,9 +178,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
     lastSolved: "2026-06-16T14:20:00Z",
     revisionCount: 2,
-    notes: "Use sliding window with a map tracking characters and their indices. Move left pointer dynamically.",
+    notes:
+      "Use sliding window with a map tracking characters and their indices. Move left pointer dynamically.",
     bookmarked: false,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-7",
@@ -188,9 +194,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/find-median-from-data-stream/",
     lastSolved: "2026-06-14T08:30:00Z",
     revisionCount: 4,
-    notes: "Two Heaps strategy: a max-heap for lower half of numbers, and min-heap for the upper half. Keep size balanced.",
+    notes:
+      "Two Heaps strategy: a max-heap for lower half of numbers, and min-heap for the upper half. Keep size balanced.",
     bookmarked: true,
-    favorite: true
+    favorite: true,
   },
   {
     id: "prob-8",
@@ -203,9 +210,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/binary-tree-level-order-traversal/",
     lastSolved: "2026-06-19T14:10:00Z",
     revisionCount: 1,
-    notes: "Use standard Queue (BFS). Group nodes by tracking the queue size at the start of each level loop.",
+    notes:
+      "Use standard Queue (BFS). Group nodes by tracking the queue size at the start of each level loop.",
     bookmarked: false,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-9",
@@ -218,9 +226,10 @@ const INITIAL_PROBLEMS = [
     url: "https://practice.geeksforgeeks.org/problems/number-of-islands/1",
     lastSolved: "2026-06-18T16:00:00Z",
     revisionCount: 2,
-    notes: "BFS/DFS search traversal. Traverse recursively when matching a land cell ('1'), flip visited cells to water ('0').",
+    notes:
+      "BFS/DFS search traversal. Traverse recursively when matching a land cell ('1'), flip visited cells to water ('0').",
     bookmarked: false,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-10",
@@ -233,9 +242,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/search-in-rotated-sorted-array/",
     lastSolved: "2026-06-13T17:40:00Z",
     revisionCount: 3,
-    notes: "Binary search tweak. Check which half of subarray is sorted, then check if target falls inside that range.",
+    notes:
+      "Binary search tweak. Check which half of subarray is sorted, then check if target falls inside that range.",
     bookmarked: true,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-11",
@@ -248,9 +258,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/lru-cache/",
     lastSolved: "2026-06-19T11:00:00Z",
     revisionCount: 5,
-    notes: "Doubly Linked List paired with a Hash Map. DLL maintains access recency order. Map keeps O(1) lookup.",
+    notes:
+      "Doubly Linked List paired with a Hash Map. DLL maintains access recency order. Map keeps O(1) lookup.",
     bookmarked: true,
-    favorite: true
+    favorite: true,
   },
   {
     id: "prob-12",
@@ -263,9 +274,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/minimum-window-substring/",
     lastSolved: "2026-06-10T19:00:00Z",
     revisionCount: 1,
-    notes: "Two-pointer sliding window with map tracking character frequencies of target string.",
+    notes:
+      "Two-pointer sliding window with map tracking character frequencies of target string.",
     bookmarked: true,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-13",
@@ -278,9 +290,10 @@ const INITIAL_PROBLEMS = [
     url: "https://practice.geeksforgeeks.org/problems/m-coloring-problem-1587115620/1",
     lastSolved: null,
     revisionCount: 0,
-    notes: "Assign colors recursively to nodes and check constraints. Backtrack if colors conflict with neighbors.",
+    notes:
+      "Assign colors recursively to nodes and check constraints. Backtrack if colors conflict with neighbors.",
     bookmarked: false,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-14",
@@ -293,9 +306,10 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/next-permutation/",
     lastSolved: "2026-06-12T13:00:00Z",
     revisionCount: 2,
-    notes: "Find pivot index going backward. Swap with smallest larger element on right, then reverse the right side.",
+    notes:
+      "Find pivot index going backward. Swap with smallest larger element on right, then reverse the right side.",
     bookmarked: false,
-    favorite: false
+    favorite: false,
   },
   {
     id: "prob-15",
@@ -308,20 +322,72 @@ const INITIAL_PROBLEMS = [
     url: "https://leetcode.com/problems/merge-intervals/",
     lastSolved: "2026-06-19T13:45:00Z",
     revisionCount: 2,
-    notes: "Sort intervals by start values first. Loop and merge intervals if interval[i].start <= previous.end.",
+    notes:
+      "Sort intervals by start values first. Loop and merge intervals if interval[i].start <= previous.end.",
     bookmarked: true,
-    favorite: false
-  }
+    favorite: false,
+  },
 ];
 
 // Mock achievements
 const ACHIEVEMENTS = [
-  { id: "ach-1", title: "First Problem", desc: "Solved your first coding problem", progress: "100%", earned: true, icon: "CheckCircle2", color: "from-blue-500/20 to-indigo-500/20 border-blue-500/40 text-blue-400" },
-  { id: "ach-2", title: "10 Day Streak", desc: "Maintained active practice for 10 straight days", progress: "100%", earned: true, icon: "Flame", color: "from-orange-500/20 to-red-500/20 border-orange-500/40 text-orange-400" },
-  { id: "ach-3", title: "100 Problems", desc: "Solve 100 coding problems in total", progress: "100%", earned: true, icon: "Trophy", color: "from-amber-500/20 to-yellow-500/20 border-yellow-500/40 text-yellow-400" },
-  { id: "ach-4", title: "Array Master", desc: "Complete 15 Array problems", progress: "92%", earned: false, icon: "Zap", color: "from-indigo-500/10 to-purple-500/10 border-white/10 text-indigo-400" },
-  { id: "ach-5", title: "Graph Explorer", desc: "Traverse 8 complex Graph questions", progress: "60%", earned: false, icon: "Compass", color: "from-cyan-500/10 to-blue-500/10 border-white/10 text-cyan-400" },
-  { id: "ach-6", title: "DP Beginner", desc: "Unlock 5 Dynamic Programming solutions", progress: "20%", earned: false, icon: "Brain", color: "from-pink-500/10 to-rose-500/10 border-white/10 text-pink-400" }
+  {
+    id: "ach-1",
+    title: "First Problem",
+    desc: "Solved your first coding problem",
+    progress: "100%",
+    earned: true,
+    icon: "CheckCircle2",
+    color: "from-blue-500/20 to-indigo-500/20 border-blue-500/40 text-blue-400",
+  },
+  {
+    id: "ach-2",
+    title: "10 Day Streak",
+    desc: "Maintained active practice for 10 straight days",
+    progress: "100%",
+    earned: true,
+    icon: "Flame",
+    color:
+      "from-orange-500/20 to-red-500/20 border-orange-500/40 text-orange-400",
+  },
+  {
+    id: "ach-3",
+    title: "100 Problems",
+    desc: "Solve 100 coding problems in total",
+    progress: "100%",
+    earned: true,
+    icon: "Trophy",
+    color:
+      "from-amber-500/20 to-yellow-500/20 border-yellow-500/40 text-yellow-400",
+  },
+  {
+    id: "ach-4",
+    title: "Array Master",
+    desc: "Complete 15 Array problems",
+    progress: "92%",
+    earned: false,
+    icon: "Zap",
+    color:
+      "from-indigo-500/10 to-purple-500/10 border-white/10 text-indigo-400",
+  },
+  {
+    id: "ach-5",
+    title: "Graph Explorer",
+    desc: "Traverse 8 complex Graph questions",
+    progress: "60%",
+    earned: false,
+    icon: "Compass",
+    color: "from-cyan-500/10 to-blue-500/10 border-white/10 text-cyan-400",
+  },
+  {
+    id: "ach-6",
+    title: "DP Beginner",
+    desc: "Unlock 5 Dynamic Programming solutions",
+    progress: "20%",
+    earned: false,
+    icon: "Brain",
+    color: "from-pink-500/10 to-rose-500/10 border-white/10 text-pink-400",
+  },
 ];
 
 const CodingJourney = () => {
@@ -339,8 +405,6 @@ const CodingJourney = () => {
   const [selectedProblem, setSelectedProblem] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-
-
   // Filters State
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDifficulty, setSelectedDifficulty] = useState("All");
@@ -349,8 +413,40 @@ const CodingJourney = () => {
   const [selectedCompany, setSelectedCompany] = useState("All");
 
   // Options lists compiled from dataset
-  const topicsList = ["Arrays", "Strings", "Trees", "Graphs", "DP", "Sorting", "Searching", "Linked List", "Stack", "Queue", "Heap", "Trie", "Backtracking", "Greedy", "Bit Manipulation", "Sliding Window", "Binary Search", "Math", "Hashing", "Recursion"];
-  const companiesList = ["Google", "Microsoft", "Amazon", "Adobe", "Uber", "Atlassian", "Flipkart", "Oracle", "Meta", "Apple"];
+  const topicsList = [
+    "Arrays",
+    "Strings",
+    "Trees",
+    "Graphs",
+    "DP",
+    "Sorting",
+    "Searching",
+    "Linked List",
+    "Stack",
+    "Queue",
+    "Heap",
+    "Trie",
+    "Backtracking",
+    "Greedy",
+    "Bit Manipulation",
+    "Sliding Window",
+    "Binary Search",
+    "Math",
+    "Hashing",
+    "Recursion",
+  ];
+  const companiesList = [
+    "Google",
+    "Microsoft",
+    "Amazon",
+    "Adobe",
+    "Uber",
+    "Atlassian",
+    "Flipkart",
+    "Oracle",
+    "Meta",
+    "Apple",
+  ];
 
   // Heatmap layout: generate random activity grid for 53 weeks * 7 days
   const heatmapData = useMemo(() => {
@@ -367,47 +463,75 @@ const CodingJourney = () => {
   const filteredProblems = useMemo(() => {
     if (isEmptyState) return [];
     return problems.filter((prob) => {
-      const matchesSearch = prob.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesDifficulty = selectedDifficulty === "All" || prob.difficulty === selectedDifficulty;
-      const matchesStatus = selectedStatus === "All" || prob.status === selectedStatus;
-      const matchesTopic = selectedTopic === "All" || prob.topic === selectedTopic;
-      const matchesCompany = selectedCompany === "All" || prob.companyTags.includes(selectedCompany);
-      return matchesSearch && matchesDifficulty && matchesStatus && matchesTopic && matchesCompany;
+      const matchesSearch = prob.name
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      const matchesDifficulty =
+        selectedDifficulty === "All" || prob.difficulty === selectedDifficulty;
+      const matchesStatus =
+        selectedStatus === "All" || prob.status === selectedStatus;
+      const matchesTopic =
+        selectedTopic === "All" || prob.topic === selectedTopic;
+      const matchesCompany =
+        selectedCompany === "All" || prob.companyTags.includes(selectedCompany);
+      return (
+        matchesSearch &&
+        matchesDifficulty &&
+        matchesStatus &&
+        matchesTopic &&
+        matchesCompany
+      );
     });
-  }, [problems, searchTerm, selectedDifficulty, selectedStatus, selectedTopic, selectedCompany, isEmptyState]);
+  }, [
+    problems,
+    searchTerm,
+    selectedDifficulty,
+    selectedStatus,
+    selectedTopic,
+    selectedCompany,
+    isEmptyState,
+  ]);
 
   // Statistics recalculations based on current state (excluding empty state)
   const computedStats = useMemo(() => {
     if (isEmptyState) {
       return { solvedCount: 0, streak: 0, acceptance: 0, topicsMastered: 0 };
     }
-    const solved = problems.filter(p => p.status === "Solved").length;
-    const attempted = problems.filter(p => p.status === "Attempted").length;
+    const solved = problems.filter((p) => p.status === "Solved").length;
+    const attempted = problems.filter((p) => p.status === "Attempted").length;
     const total = problems.length;
-    const acceptance = total > 0 ? Math.round((solved / (solved + attempted || 1)) * 100) : 0;
-    
+    const acceptance =
+      total > 0 ? Math.round((solved / (solved + attempted || 1)) * 100) : 0;
+
     // Mastered count: topics where >= 70% problems solved (simplified logic)
-    const topicsMastered = 14; 
+    const topicsMastered = 14;
     return {
-      solvedCount: 245 + (solved - INITIAL_PROBLEMS.filter(p => p.status === "Solved").length), // offset base solved
+      solvedCount:
+        245 +
+        (solved - INITIAL_PROBLEMS.filter((p) => p.status === "Solved").length), // offset base solved
       streak: 12,
       acceptance: Math.max(78, acceptance),
-      topicsMastered
+      topicsMastered,
     };
   }, [problems, isEmptyState]);
 
-  // Recharts difficulty distributions
-  const difficultyChartData = useMemo(() => {
+  // Recharts Problem Categories Distribution
+  const problemCategoriesChartData = useMemo(() => {
     if (isEmptyState) return [];
-    const easyCount = problems.filter(p => p.difficulty === "Easy" && p.status === "Solved").length * 8 + 60;
-    const medCount = problems.filter(p => p.difficulty === "Medium" && p.status === "Solved").length * 6 + 45;
-    const hardCount = problems.filter(p => p.difficulty === "Hard" && p.status === "Solved").length * 5 + 15;
+
     return [
-      { name: "Easy", count: easyCount, fill: "#10B981" },
-      { name: "Medium", count: medCount, fill: "#F59E0B" },
-      { name: "Hard", count: hardCount, fill: "#EF4444" }
+      { name: "Arrays", count: 42, fill: "#6366F1" },
+      { name: "Strings", count: 28, fill: "#A855F7" },
+      { name: "Linked Lists", count: 18, fill: "#06B6D4" },
+      { name: "Trees", count: 16, fill: "#EC4899" },
+      { name: "Graphs", count: 14, fill: "#10B981" },
+      { name: "Dynamic Programming", count: 12, fill: "#F59E0B" },
+      { name: "Binary Search", count: 10, fill: "#3B82F6" },
+      { name: "Sliding Window", count: 8, fill: "#EF4444" },
+      { name: "Heap", count: 7, fill: "#14B8A6" },
+      { name: "Greedy", count: 5, fill: "#8B5CF6" },
     ];
-  }, [problems, isEmptyState]);
+  }, [isEmptyState]);
 
   // Weekly Practice line values
   const weeklyPracticeData = [
@@ -417,17 +541,27 @@ const CodingJourney = () => {
     { name: "Thu", Problems: isEmptyState ? 0 : 8 },
     { name: "Fri", Problems: isEmptyState ? 0 : 5 },
     { name: "Sat", Problems: isEmptyState ? 0 : 2 },
-    { name: "Sun", Problems: isEmptyState ? 0 : 7 }
+    { name: "Sun", Problems: isEmptyState ? 0 : 7 },
   ];
 
-  // Platform Pie chart distributions
-  const platformChartData = [
-    { name: "LeetCode", value: isEmptyState ? 0 : 135, color: "#6366F1" },
-    { name: "GeeksforGeeks", value: isEmptyState ? 0 : 65, color: "#a855f7" },
-    { name: "Codeforces", value: isEmptyState ? 0 : 25, color: "#06B6D4" },
-    { name: "CodeChef", value: isEmptyState ? 0 : 12, color: "#EC4899" },
-    { name: "HackerRank", value: isEmptyState ? 0 : 8, color: "#10B981" }
-  ].filter(p => p.value > 0);
+  // Problems Solved by Difficulty (Pie Chart)
+  const problemDifficultyChartData = [
+    {
+      name: "Easy",
+      value: isEmptyState ? 0 : 82,
+      color: "#10B981",
+    },
+    {
+      name: "Medium",
+      value: isEmptyState ? 0 : 56,
+      color: "#F59E0B",
+    },
+    {
+      name: "Hard",
+      value: isEmptyState ? 0 : 22,
+      color: "#EF4444",
+    },
+  ].filter((difficulty) => difficulty.value > 0);
 
   // Topic Progress array
   const topicsProgress = [
@@ -435,15 +569,35 @@ const CodingJourney = () => {
     { name: "Strings", percent: isEmptyState ? 0 : 80 },
     { name: "Trees", percent: isEmptyState ? 0 : 60 },
     { name: "Graphs", percent: isEmptyState ? 0 : 40 },
-    { name: "Dynamic Programming", percent: isEmptyState ? 0 : 20 }
+    { name: "Dynamic Programming", percent: isEmptyState ? 0 : 20 },
   ];
 
   // Recent activity logs
   const recentActivities = [
-    { text: "Solved Two Sum", time: "2 hours ago", platform: "LeetCode", difficulty: "Easy" },
-    { text: "Completed Binary Tree Level Order Traversal", time: "4 hours ago", platform: "LeetCode", difficulty: "Easy" },
-    { text: "Bookmarked LRU Cache", time: "1 day ago", platform: "LeetCode", difficulty: "Medium" },
-    { text: "Revised Number of Islands", time: "1 day ago", platform: "GeeksforGeeks", difficulty: "Medium" },
+    {
+      text: "Solved Two Sum",
+      time: "2 hours ago",
+      platform: "LeetCode",
+      difficulty: "Easy",
+    },
+    {
+      text: "Completed Binary Tree Level Order Traversal",
+      time: "4 hours ago",
+      platform: "LeetCode",
+      difficulty: "Easy",
+    },
+    {
+      text: "Bookmarked LRU Cache",
+      time: "1 day ago",
+      platform: "LeetCode",
+      difficulty: "Medium",
+    },
+    {
+      text: "Revised Number of Islands",
+      time: "1 day ago",
+      platform: "GeeksforGeeks",
+      difficulty: "Medium",
+    },
   ];
 
   // Actions scrolling handlers
@@ -459,7 +613,9 @@ const CodingJourney = () => {
     if (!selectedProblem) return;
     const updated = { ...selectedProblem, [field]: val };
     setSelectedProblem(updated);
-    setProblems(prev => prev.map(p => p.id === selectedProblem.id ? updated : p));
+    setProblems((prev) =>
+      prev.map((p) => (p.id === selectedProblem.id ? updated : p)),
+    );
   };
 
   const incrementRevision = () => {
@@ -476,31 +632,35 @@ const CodingJourney = () => {
   // Toggle Bookmark state directly from table or drawer
   const toggleBookmark = (id, e) => {
     if (e) e.stopPropagation();
-    setProblems(prev => prev.map(p => {
-      if (p.id === id) {
-        const updated = { ...p, bookmarked: !p.bookmarked };
-        if (selectedProblem && selectedProblem.id === id) {
-          setSelectedProblem(updated);
+    setProblems((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          const updated = { ...p, bookmarked: !p.bookmarked };
+          if (selectedProblem && selectedProblem.id === id) {
+            setSelectedProblem(updated);
+          }
+          return updated;
         }
-        return updated;
-      }
-      return p;
-    }));
+        return p;
+      }),
+    );
   };
 
   // Toggle Favorite state directly from drawer
   const toggleFavorite = (id, e) => {
     if (e) e.stopPropagation();
-    setProblems(prev => prev.map(p => {
-      if (p.id === id) {
-        const updated = { ...p, favorite: !p.favorite };
-        if (selectedProblem && selectedProblem.id === id) {
-          setSelectedProblem(updated);
+    setProblems((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          const updated = { ...p, favorite: !p.favorite };
+          if (selectedProblem && selectedProblem.id === id) {
+            setSelectedProblem(updated);
+          }
+          return updated;
         }
-        return updated;
-      }
-      return p;
-    }));
+        return p;
+      }),
+    );
   };
 
   const handleResetFilters = () => {
@@ -510,8 +670,6 @@ const CodingJourney = () => {
     setSelectedTopic("All");
     setSelectedCompany("All");
   };
-
-
 
   return (
     <>
@@ -560,12 +718,10 @@ const CodingJourney = () => {
 
         {/* MAIN DISPLAY CONTAINER */}
         <div className="lg:ml-[280px] flex-1 flex flex-col h-screen overflow-y-auto z-10 relative">
-          
           <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
 
           {/* MAIN DYNAMIC CONTENT */}
           <main className="flex-1 p-6 space-y-8 max-w-7xl mx-auto w-full">
-            
             {/* HERO SECTION */}
             <section className="relative rounded-3xl border border-white/10 bg-slate-950/20 backdrop-blur-xl p-6 sm:p-8 overflow-hidden text-left">
               <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent pointer-events-none" />
@@ -574,14 +730,18 @@ const CodingJourney = () => {
               <div className="relative z-10 max-w-2xl space-y-4">
                 <div className="inline-flex items-center space-x-1.5 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full text-xs text-indigo-400 font-bold uppercase tracking-wider">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Module 4 &bull; Algorithms &amp; Platforms Tracker</span>
+                  <span>
+                    Module 4 &bull; Algorithms &amp; Platforms Tracker
+                  </span>
                 </div>
-                
+
                 <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
                   Coding Journey
                 </h1>
                 <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-light">
-                  Track your coding practice, master DSA, and prepare for technical interviews. Sync details dynamically across multiple platforms.
+                  Track your coding practice, master DSA, and prepare for
+                  technical interviews. Sync details dynamically across multiple
+                  platforms.
                 </p>
 
                 <div className="flex flex-wrap gap-3 pt-2">
@@ -614,9 +774,12 @@ const CodingJourney = () => {
                   <Code2 className="w-8 h-8" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-lg font-bold text-white">Start Your Coding Journey</h3>
+                  <h3 className="text-lg font-bold text-white">
+                    Start Your Coding Journey
+                  </h3>
                   <p className="text-sm text-slate-400 leading-relaxed font-light max-w-xs mx-auto">
-                    Solve your first coding problem to unlock analytics, topic masteries, heatmaps, and progress tracking metrics.
+                    Solve your first coding problem to unlock analytics, topic
+                    masteries, heatmaps, and progress tracking metrics.
                   </p>
                 </div>
                 <button
@@ -629,14 +792,15 @@ const CodingJourney = () => {
             ) : (
               /* POPULATED DASHBOARD VIEW */
               <div className="space-y-8">
-                
                 {/* STATISTICS CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Card 1: Problems Solved */}
                   <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all">
                     <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                     <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Problems Solved</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Problems Solved
+                      </span>
                       <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
                         <CheckCircle2 className="w-4 h-4" />
                       </div>
@@ -655,7 +819,9 @@ const CodingJourney = () => {
                   <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 transition-all">
                     <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
                     <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Current Streak</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Current Streak
+                      </span>
                       <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
                         <Flame className="w-4 h-4 animate-pulse" />
                       </div>
@@ -674,7 +840,9 @@ const CodingJourney = () => {
                   <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all">
                     <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
                     <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Acceptance Rate</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Acceptance Rate
+                      </span>
                       <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
                         <Target className="w-4 h-4" />
                       </div>
@@ -693,7 +861,9 @@ const CodingJourney = () => {
                   <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all">
                     <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
                     <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Topics Mastered</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Topics Mastered
+                      </span>
                       <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
                         <Brain className="w-4 h-4" />
                       </div>
@@ -709,31 +879,112 @@ const CodingJourney = () => {
                   </div>
                 </div>
 
-                {/* PROGRESS SECTION & PLATFORM CHARTS */}
-                <div id="progress-charts" className="grid grid-cols-1 lg:grid-cols-12 gap-8 scroll-mt-24">
+                {/* Problem solved by categories */}
+                <div
+                  id="progress-charts"
+                  className="grid grid-cols-1 lg:grid-cols-12 gap-8 scroll-mt-24"
+                >
                   {/* Left Column (7 cols): Solving Difficulty and Weekly Practice */}
                   <div className="lg:col-span-7 space-y-8">
-                    
-                    {/* Solving difficulty (Bar chart) */}
+                    {/* Solving Categories (Bar chart) */}
                     <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
                       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                      <h3 className="text-base font-semibold text-white mb-4">Problems Solved by Difficulty</h3>
-                      
-                      <div className="h-[200px] w-full">
+                      <h3 className="text-base font-semibold text-white mb-4">
+                        Problems Solved by Categories
+                      </h3>
+
+                      <div className="h-[220px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={difficultyChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                            <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
-                            <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                          <BarChart
+                            data={problemCategoriesChartData}
+                            margin={{
+                              top: 10,
+                              right: 10,
+                              left: -25,
+                              bottom: 0,
+                            }}
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(255,255,255,0.05)"
+                              vertical={false}
+                            />
+                            <XAxis
+                              dataKey="name"
+                              stroke="#64748b"
+                              fontSize={10}
+                              tickLine={false}
+                              interval={0}
+                              height={60}
+                              tick={({ x, y, payload }) => {
+                                const words = payload.value.split(" ");
+
+                                return (
+                                  <g transform={`translate(${x},${y})`}>
+                                    {words.length === 1 ? (
+                                      <text
+                                        x={0}
+                                        y={15}
+                                        textAnchor="middle"
+                                        fill="#94A3B8"
+                                        fontSize={10}
+                                      >
+                                        {payload.value}
+                                      </text>
+                                    ) : (
+                                      <>
+                                        <text
+                                          x={0}
+                                          y={10}
+                                          textAnchor="middle"
+                                          fill="#94A3B8"
+                                          fontSize={10}
+                                        >
+                                          {words.slice(0, -1).join(" ")}
+                                        </text>
+
+                                        <text
+                                          x={0}
+                                          y={24}
+                                          textAnchor="middle"
+                                          fill="#94A3B8"
+                                          fontSize={10}
+                                        >
+                                          {words[words.length - 1]}
+                                        </text>
+                                      </>
+                                    )}
+                                  </g>
+                                );
+                              }}
+                            />
+                            <YAxis
+                              stroke="#64748b"
+                              fontSize={11}
+                              tickLine={false}
+                            />
                             <Tooltip
-                              contentStyle={{ background: "#080e24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
+                              contentStyle={{
+                                background: "#080e24",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                borderRadius: "12px",
+                              }}
                               itemStyle={{ color: "#fff" }}
                               labelClassName="text-slate-400 font-bold"
                             />
-                            <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={40}>
-                              {difficultyChartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                              ))}
+                            <Bar
+                              dataKey="count"
+                              radius={[8, 8, 0, 0]}
+                              barSize={40}
+                            >
+                              {problemCategoriesChartData.map(
+                                (entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.fill}
+                                  />
+                                ),
+                              )}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
@@ -743,22 +994,63 @@ const CodingJourney = () => {
                     {/* Weekly practice (Line chart) */}
                     <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
                       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
-                      <h3 className="text-base font-semibold text-white mb-4">Weekly Practice Consistency</h3>
-                      
+                      <h3 className="text-base font-semibold text-white mb-4">
+                        Weekly Practice Consistency
+                      </h3>
+
                       <div className="h-[200px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <ReChartsLineChart data={weeklyPracticeData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                          <ReChartsLineChart
+                            data={weeklyPracticeData}
+                            margin={{
+                              top: 10,
+                              right: 10,
+                              left: -25,
+                              bottom: 0,
+                            }}
+                          >
                             <defs>
-                              <linearGradient id="lineGlow" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#818cf8" stopOpacity={0.2}/>
-                                <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
+                              <linearGradient
+                                id="lineGlow"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="5%"
+                                  stopColor="#818cf8"
+                                  stopOpacity={0.2}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor="#818cf8"
+                                  stopOpacity={0}
+                                />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                            <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
-                            <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(255,255,255,0.05)"
+                              vertical={false}
+                            />
+                            <XAxis
+                              dataKey="name"
+                              stroke="#64748b"
+                              fontSize={11}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              stroke="#64748b"
+                              fontSize={11}
+                              tickLine={false}
+                            />
                             <Tooltip
-                              contentStyle={{ background: "#080e24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
+                              contentStyle={{
+                                background: "#080e24",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                borderRadius: "12px",
+                              }}
                               itemStyle={{ color: "#fff" }}
                               labelClassName="text-slate-400 font-bold"
                             />
@@ -767,34 +1059,43 @@ const CodingJourney = () => {
                               dataKey="Problems"
                               stroke="#818cf8"
                               strokeWidth={3}
-                              dot={{ r: 4, stroke: "#818cf8", strokeWidth: 2, fill: "#080e24" }}
+                              dot={{
+                                r: 4,
+                                stroke: "#818cf8",
+                                strokeWidth: 2,
+                                fill: "#080e24",
+                              }}
                               activeDot={{ r: 6, fill: "#818cf8" }}
                             />
                           </ReChartsLineChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
-
                   </div>
 
                   {/* Right Column (5 cols): Platform Distribution & Topics Progress */}
                   <div className="lg:col-span-5 space-y-8">
-                    
-                    {/* Platform distribution (Pie Chart) */}
+                    {/* Problem solved by difficulty (Pie Chart) */}
                     <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
                       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                      <h3 className="text-base font-semibold text-white mb-4">Platform Distribution</h3>
-                      
+                      <h3 className="text-base font-semibold text-white mb-4">
+                        Problem Solved by Difficulty
+                      </h3>
+
                       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="h-[150px] w-[150px] shrink-0">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Tooltip
-                                contentStyle={{ background: "#080e24", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
+                                contentStyle={{
+                                  background: "#080e24",
+                                  border: "1px solid rgba(255,255,255,0.1)",
+                                  borderRadius: "12px",
+                                }}
                                 itemStyle={{ color: "#fff" }}
                               />
                               <Pie
-                                data={platformChartData}
+                                data={problemDifficultyChartData}
                                 cx="50%"
                                 cy="50%"
                                 innerRadius={40}
@@ -802,22 +1103,37 @@ const CodingJourney = () => {
                                 paddingAngle={5}
                                 dataKey="value"
                               >
-                                {platformChartData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
+                                {problemDifficultyChartData.map(
+                                  (entry, index) => (
+                                    <Cell
+                                      key={`cell-${index}`}
+                                      fill={entry.color}
+                                    />
+                                  ),
+                                )}
                               </Pie>
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
-                        
+
                         <div className="flex-1 space-y-2 text-xs text-slate-300 w-full">
-                          {platformChartData.map((item, index) => (
-                            <div key={index} className="flex items-center justify-between">
+                          {problemDifficultyChartData.map((item, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between"
+                            >
                               <div className="flex items-center space-x-2">
-                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                                <span className="font-medium text-slate-300">{item.name}</span>
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: item.color }}
+                                />
+                                <span className="font-medium text-slate-300">
+                                  {item.name}
+                                </span>
                               </div>
-                              <span className="font-mono font-bold text-white">{item.value} solved</span>
+                              <span className="font-mono font-bold text-white">
+                                {item.value} solved
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -827,20 +1143,29 @@ const CodingJourney = () => {
                     {/* Topic Progress lists */}
                     <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
                       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-                      <h3 className="text-base font-semibold text-white mb-4">Key Topic Progress</h3>
-                      
+                      <h3 className="text-base font-semibold text-white mb-4">
+                        Key Topic Progress
+                      </h3>
+
                       <div className="space-y-4">
                         {topicsProgress.map((topic, index) => (
                           <div key={index} className="space-y-1.5">
                             <div className="flex justify-between text-xs font-semibold">
-                              <span className="text-slate-300">{topic.name}</span>
-                              <span className="text-indigo-400">{topic.percent}%</span>
+                              <span className="text-slate-300">
+                                {topic.name}
+                              </span>
+                              <span className="text-indigo-400">
+                                {topic.percent}%
+                              </span>
                             </div>
                             <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-white/5 relative">
                               <motion.div
                                 initial={{ width: 0 }}
                                 animate={{ width: `${topic.percent}%` }}
-                                transition={{ duration: 1.2, delay: index * 0.1 }}
+                                transition={{
+                                  duration: 1.2,
+                                  delay: index * 0.1,
+                                }}
                                 className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
                               />
                             </div>
@@ -848,11 +1173,10 @@ const CodingJourney = () => {
                         ))}
                       </div>
                     </div>
-
                   </div>
                 </div>
 
-                {/* CODING HEATMAP */}
+                {/* CODING HEATMAP 
                 <section className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
                   <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                   
@@ -871,10 +1195,10 @@ const CodingJourney = () => {
                     </div>
                   </div>
 
-                  {/* Heatmap Grid Wrapper */}
+                  // Heatmap Grid Wrapper 
                   <div className="overflow-x-auto pb-2">
                     <div className="min-w-[760px] p-2 bg-slate-950/20 rounded-2xl border border-white/5 flex gap-4">
-                      {/* Weekday labels */}
+                      // Weekday labels 
                       <div className="flex flex-col justify-between py-1 text-[9px] text-slate-500 font-mono h-[86px]">
                         <span>Mon</span>
                         <span>Wed</span>
@@ -882,9 +1206,9 @@ const CodingJourney = () => {
                         <span>Sun</span>
                       </div>
                       
-                      {/* Grid cells */}
+                      //Grid cells 
                       <div className="flex-1 flex flex-col justify-between">
-                        {/* Month labels header */}
+                        //Month labels header 
                         <div className="flex justify-between text-[9px] text-slate-500 font-mono mb-2 px-1">
                           <span>Jul</span>
                           <span>Aug</span>
@@ -900,7 +1224,7 @@ const CodingJourney = () => {
                           <span>Jun</span>
                         </div>
 
-                        {/* Contribution Board Grid */}
+                        //Contribution Board Grid 
                         <div className="heatmap-grid h-[86px] w-full">
                           {heatmapData.map((count, index) => {
                             let bgColor = "bg-white/[0.04]";
@@ -921,210 +1245,14 @@ const CodingJourney = () => {
                       </div>
                     </div>
                   </div>
-                </section>
-
-                {/* FILTER & PROBLEMS TABLE SECTION */}
-                <section id="problems-list" className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg scroll-mt-24">
-                  <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
-                  
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                      <Code2 className="w-5 h-5 text-purple-400" />
-                      Interactive Problem Practice List
-                    </h3>
-                    <button
-                      onClick={handleResetFilters}
-                      className="text-xs text-purple-400 hover:text-purple-300 font-bold transition-all cursor-pointer focus:outline-none"
-                    >
-                      Reset Filters
-                    </button>
-                  </div>
-
-                  {/* Filter controls row */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
-                    
-                    {/* Search bar inside row */}
-                    <div className="relative col-span-2 lg:col-span-1">
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search problems..."
-                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60"
-                      />
-                    </div>
-
-                    {/* Difficulty Dropdown */}
-                    <div>
-                      <select
-                        value={selectedDifficulty}
-                        onChange={(e) => setSelectedDifficulty(e.target.value)}
-                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60"
-                      >
-                        <option value="All">All Difficulties</option>
-                        <option value="Easy">Easy</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Hard">Hard</option>
-                      </select>
-                    </div>
-
-                    {/* Status Dropdown */}
-                    <div>
-                      <select
-                        value={selectedStatus}
-                        onChange={(e) => setSelectedStatus(e.target.value)}
-                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60"
-                      >
-                        <option value="All">All Statuses</option>
-                        <option value="Solved">Solved</option>
-                        <option value="Attempted">Attempted</option>
-                        <option value="Unsolved">Unsolved</option>
-                      </select>
-                    </div>
-
-                    {/* Topic Dropdown */}
-                    <div>
-                      <select
-                        value={selectedTopic}
-                        onChange={(e) => setSelectedTopic(e.target.value)}
-                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60"
-                      >
-                        <option value="All">All Topics</option>
-                        {topicsList.map((t, idx) => (
-                          <option key={idx} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Company Dropdown */}
-                    <div>
-                      <select
-                        value={selectedCompany}
-                        onChange={(e) => setSelectedCompany(e.target.value)}
-                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60"
-                      >
-                        <option value="All">All Companies</option>
-                        {companiesList.map((c, idx) => (
-                          <option key={idx} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                  </div>
-
-                  {/* Modern Table List */}
-                  <div className="overflow-x-auto border border-white/5 rounded-2xl bg-slate-950/20">
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-xs uppercase font-bold text-slate-500 border-b border-white/5 bg-slate-950/30">
-                        <tr>
-                          <th className="px-6 py-4 w-12 text-center">Status</th>
-                          <th className="px-6 py-4">Problem Name</th>
-                          <th className="px-6 py-4">Difficulty</th>
-                          <th className="px-6 py-4">Topic</th>
-                          <th className="px-6 py-4">Platform</th>
-                          <th className="px-6 py-4">Companies</th>
-                          <th className="px-6 py-4">Last Solved</th>
-                          <th className="px-6 py-4 w-16 text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5 text-xs sm:text-sm font-semibold">
-                        {filteredProblems.length === 0 ? (
-                          <tr>
-                            <td colSpan={8} className="px-6 py-8 text-center text-slate-500 font-medium">
-                              No coding problems match the active filters.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredProblems.map((prob) => {
-                            let diffColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-                            if (prob.difficulty === "Medium") diffColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
-                            if (prob.difficulty === "Hard") diffColor = "text-red-400 bg-red-500/10 border-red-500/20";
-
-                            let statusIcon = <Clock className="w-4 h-4 text-slate-500" />;
-                            let statusText = "Unsolved";
-                            if (prob.status === "Solved") {
-                              statusIcon = <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
-                              statusText = "Solved";
-                            }
-                            if (prob.status === "Attempted") {
-                              statusIcon = <Zap className="w-4 h-4 text-amber-400" />;
-                              statusText = "Attempted";
-                            }
-
-                            return (
-                              <tr
-                                key={prob.id}
-                                onClick={() => {
-                                  setSelectedProblem(prob);
-                                  setDrawerOpen(true);
-                                }}
-                                className="hover:bg-white/[0.02] cursor-pointer transition-colors"
-                              >
-                                <td className="px-6 py-4 text-center">
-                                  <div className="flex items-center justify-center" title={statusText}>
-                                    {statusIcon}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 text-white font-bold max-w-xs truncate">
-                                  {prob.name}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className={`px-2.5 py-0.5 rounded border text-[10px] uppercase font-bold tracking-wider ${diffColor}`}>
-                                    {prob.difficulty}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-slate-300">{prob.topic}</td>
-                                <td className="px-6 py-4 text-slate-400">{prob.platform}</td>
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-wrap gap-1.5 max-w-[200px]">
-                                    {prob.companyTags.slice(0, 2).map((tag, idx) => (
-                                      <span key={idx} className="bg-white/5 border border-white/10 text-slate-300 rounded px-1.5 py-0.5 text-[9px]">
-                                        {tag}
-                                      </span>
-                                    ))}
-                                    {prob.companyTags.length > 2 && (
-                                      <span className="text-slate-500 text-[9px] self-center">
-                                        +{prob.companyTags.length - 2} more
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 text-slate-500 font-mono text-xs">
-                                  {prob.lastSolved
-                                    ? new Date(prob.lastSolved).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                                    : "—"}
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                  <div className="flex items-center justify-center space-x-2">
-                                    <button
-                                      onClick={(e) => toggleBookmark(prob.id, e)}
-                                      className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                                        prob.bookmarked
-                                          ? "text-indigo-400 border-indigo-500/30 bg-indigo-500/10"
-                                          : "text-slate-500 border-white/5 hover:text-white"
-                                      }`}
-                                      title={prob.bookmarked ? "Bookmarked" : "Bookmark problem"}
-                                    >
-                                      <Bookmark className="w-3.5 h-3.5 fill-current" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
+                </section> */}
 
                 {/* RECENT ACTIVITY & ACHIEVEMENTS GRIDS */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  
                   {/* Achievements Grid (7 columns) */}
                   <div className="lg:col-span-7 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
                     <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                    
+
                     <div>
                       <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
                         <Award className="w-5 h-5 text-cyan-400" />
@@ -1138,24 +1266,45 @@ const CodingJourney = () => {
                             className={`p-4 rounded-2xl border bg-gradient-to-br flex items-center space-x-3.5 transition-all duration-300 hover:scale-[1.02] ${ach.color}`}
                           >
                             <div className="p-2.5 rounded-xl bg-slate-950/40 shrink-0">
-                              {ach.icon === "Flame" && <Flame className="w-5 h-5 animate-pulse" />}
-                              {ach.icon === "Trophy" && <Trophy className="w-5 h-5" />}
-                              {ach.icon === "CheckCircle2" && <CheckCircle2 className="w-5 h-5" />}
-                              {ach.icon === "Zap" && <Zap className="w-5 h-5" />}
-                              {ach.icon === "Compass" && <Activity className="w-5 h-5" />}
-                              {ach.icon === "Brain" && <Brain className="w-5 h-5" />}
+                              {ach.icon === "Flame" && (
+                                <Flame className="w-5 h-5 animate-pulse" />
+                              )}
+                              {ach.icon === "Trophy" && (
+                                <Trophy className="w-5 h-5" />
+                              )}
+                              {ach.icon === "CheckCircle2" && (
+                                <CheckCircle2 className="w-5 h-5" />
+                              )}
+                              {ach.icon === "Zap" && (
+                                <Zap className="w-5 h-5" />
+                              )}
+                              {ach.icon === "Compass" && (
+                                <Activity className="w-5 h-5" />
+                              )}
+                              {ach.icon === "Brain" && (
+                                <Brain className="w-5 h-5" />
+                              )}
                             </div>
-                            
+
                             <div className="min-w-0 flex-1 text-left space-y-1">
                               <div className="flex justify-between items-center">
-                                <h4 className="text-xs sm:text-sm font-bold text-white truncate">{ach.title}</h4>
-                                <span className="text-[10px] font-mono text-slate-400">{ach.progress}</span>
+                                <h4 className="text-xs sm:text-sm font-bold text-white truncate">
+                                  {ach.title}
+                                </h4>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {ach.progress}
+                                </span>
                               </div>
-                              <p className="text-[10px] sm:text-xs text-slate-400 font-light leading-relaxed truncate">{ach.desc}</p>
-                              
+                              <p className="text-[10px] sm:text-xs text-slate-400 font-light leading-relaxed truncate">
+                                {ach.desc}
+                              </p>
+
                               {/* Small progress bar */}
                               <div className="w-full h-1 bg-slate-950/40 rounded-full overflow-hidden">
-                                <div className="h-full bg-current rounded-full" style={{ width: ach.progress }} />
+                                <div
+                                  className="h-full bg-current rounded-full"
+                                  style={{ width: ach.progress }}
+                                />
                               </div>
                             </div>
                           </div>
@@ -1167,7 +1316,7 @@ const CodingJourney = () => {
                   {/* Recent Activity Log (5 columns) */}
                   <div className="lg:col-span-5 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
                     <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-                    
+
                     <div>
                       <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
                         <Clock className="w-5 h-5 text-pink-400" />
@@ -1176,18 +1325,29 @@ const CodingJourney = () => {
 
                       <div className="relative border-l border-white/5 ml-3 pl-5 space-y-6">
                         {recentActivities.map((act, index) => (
-                          <div key={index} className="relative text-left text-xs sm:text-sm">
+                          <div
+                            key={index}
+                            className="relative text-left text-xs sm:text-sm"
+                          >
                             {/* Bullet indicator */}
                             <div className="absolute -left-[26px] top-1 w-2.5 h-2.5 rounded-full bg-pink-500 border border-[#050B1F]" />
-                            
+
                             <div className="space-y-1">
-                              <p className="font-bold text-white leading-relaxed">{act.text}</p>
+                              <p className="font-bold text-white leading-relaxed">
+                                {act.text}
+                              </p>
                               <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400 font-mono">
                                 <span>{act.time}</span>
                                 <span>&bull;</span>
                                 <span>{act.platform}</span>
                                 <span>&bull;</span>
-                                <span className={act.difficulty === "Easy" ? "text-emerald-400" : "text-amber-400"}>
+                                <span
+                                  className={
+                                    act.difficulty === "Easy"
+                                      ? "text-emerald-400"
+                                      : "text-amber-400"
+                                  }
+                                >
                                   {act.difficulty}
                                 </span>
                               </div>
@@ -1198,11 +1358,9 @@ const CodingJourney = () => {
                     </div>
                   </div>
                 </div>
-
               </div>
             )}
           </main>
-
         </div>
 
         {/* SIDE DETAILS DRAWER */}
@@ -1233,7 +1391,9 @@ const CodingJourney = () => {
                 <div>
                   <div className="p-6 flex items-center justify-between border-b border-white/5">
                     <div className="flex items-center space-x-2.5">
-                      <span className="text-xs font-bold text-indigo-400 font-mono uppercase tracking-wider">Problem Details</span>
+                      <span className="text-xs font-bold text-indigo-400 font-mono uppercase tracking-wider">
+                        Problem Details
+                      </span>
                     </div>
                     <button
                       onClick={() => setDrawerOpen(false)}
@@ -1250,18 +1410,22 @@ const CodingJourney = () => {
                         {selectedProblem.name}
                       </h2>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`px-2.5 py-0.5 rounded border text-[9px] uppercase font-bold tracking-wider ${
-                          selectedProblem.difficulty === "Easy" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" :
-                          selectedProblem.difficulty === "Medium" ? "text-amber-400 bg-amber-500/10 border-amber-500/20" :
-                          "text-red-400 bg-red-500/10 border-red-500/20"
-                        }`}>
+                        <span
+                          className={`px-2.5 py-0.5 rounded border text-[9px] uppercase font-bold tracking-wider ${
+                            selectedProblem.difficulty === "Easy"
+                              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                              : selectedProblem.difficulty === "Medium"
+                                ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                                : "text-red-400 bg-red-500/10 border-red-500/20"
+                          }`}
+                        >
                           {selectedProblem.difficulty}
                         </span>
-                        
+
                         <span className="px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-bold text-slate-300">
                           {selectedProblem.topic}
                         </span>
-                        
+
                         <span className="px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-bold text-slate-400 font-mono">
                           {selectedProblem.platform}
                         </span>
@@ -1280,10 +1444,15 @@ const CodingJourney = () => {
 
                     {/* Company Tags Grid */}
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">Target Companies</label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Target Companies
+                      </label>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedProblem.companyTags.map((tag, idx) => (
-                          <span key={idx} className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-lg px-2.5 py-1 text-xs">
+                          <span
+                            key={idx}
+                            className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-lg px-2.5 py-1 text-xs"
+                          >
                             {tag}
                           </span>
                         ))}
@@ -1294,7 +1463,9 @@ const CodingJourney = () => {
                     <div className="grid grid-cols-2 gap-4 border-t border-b border-white/5 py-4">
                       {/* Revision Counter */}
                       <div className="space-y-2 text-left">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">Revision Count</label>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                          Revision Count
+                        </label>
                         <div className="flex items-center space-x-3.5">
                           <button
                             onClick={decrementRevision}
@@ -1302,7 +1473,9 @@ const CodingJourney = () => {
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
-                          <span className="text-sm font-bold font-mono text-white">{selectedProblem.revisionCount}</span>
+                          <span className="text-sm font-bold font-mono text-white">
+                            {selectedProblem.revisionCount}
+                          </span>
                           <button
                             onClick={incrementRevision}
                             className="p-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-white cursor-pointer"
@@ -1314,7 +1487,9 @@ const CodingJourney = () => {
 
                       {/* Favorite / Star Control */}
                       <div className="space-y-2 text-left">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">Priority Rating</label>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                          Priority Rating
+                        </label>
                         <button
                           onClick={(e) => toggleFavorite(selectedProblem.id, e)}
                           className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
@@ -1323,18 +1498,28 @@ const CodingJourney = () => {
                               : "text-slate-500 border-white/5 hover:text-white"
                           }`}
                         >
-                          <Star className={`w-4.5 h-4.5 ${selectedProblem.favorite ? "fill-current" : ""}`} />
-                          <span>{selectedProblem.favorite ? "Favorite Marked" : "Add to Favorites"}</span>
+                          <Star
+                            className={`w-4.5 h-4.5 ${selectedProblem.favorite ? "fill-current" : ""}`}
+                          />
+                          <span>
+                            {selectedProblem.favorite
+                              ? "Favorite Marked"
+                              : "Add to Favorites"}
+                          </span>
                         </button>
                       </div>
                     </div>
 
                     {/* Notes Text Area */}
                     <div className="space-y-2 text-left">
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">Review &amp; Approach Notes</label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Review &amp; Approach Notes
+                      </label>
                       <textarea
                         value={selectedProblem.notes || ""}
-                        onChange={(e) => handleProblemChange("notes", e.target.value)}
+                        onChange={(e) =>
+                          handleProblemChange("notes", e.target.value)
+                        }
                         placeholder="Type approach, complexity trade-offs, algorithms used..."
                         className="w-full h-32 bg-slate-950/40 border border-white/10 rounded-2xl p-3 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60 leading-relaxed font-mono"
                       />
@@ -1353,14 +1538,23 @@ const CodingJourney = () => {
                         : "text-slate-400 border-white/10 hover:text-white"
                     }`}
                   >
-                    <Bookmark className={`w-4 h-4 ${selectedProblem.bookmarked ? "fill-current" : ""}`} />
-                    <span>{selectedProblem.bookmarked ? "Bookmarked" : "Bookmark Code"}</span>
+                    <Bookmark
+                      className={`w-4 h-4 ${selectedProblem.bookmarked ? "fill-current" : ""}`}
+                    />
+                    <span>
+                      {selectedProblem.bookmarked
+                        ? "Bookmarked"
+                        : "Bookmark Code"}
+                    </span>
                   </button>
 
                   {/* Mark as Solved Status controller */}
                   <button
                     onClick={() => {
-                      const newStatus = selectedProblem.status === "Solved" ? "Attempted" : "Solved";
+                      const newStatus =
+                        selectedProblem.status === "Solved"
+                          ? "Attempted"
+                          : "Solved";
                       handleProblemChange("status", newStatus);
                     }}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-6 py-3 rounded-xl text-white text-xs font-black shadow-lg transition-all cursor-pointer ${
@@ -1370,17 +1564,17 @@ const CodingJourney = () => {
                     }`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{selectedProblem.status === "Solved" ? "Solved (Click to undo)" : "Mark as Solved"}</span>
+                    <span>
+                      {selectedProblem.status === "Solved"
+                        ? "Solved (Click to undo)"
+                        : "Mark as Solved"}
+                    </span>
                   </button>
                 </div>
-
               </motion.aside>
             </>
           )}
         </AnimatePresence>
-
-
-
       </div>
     </>
   );
