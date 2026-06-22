@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const interviewExperienceSchema = new mongoose.Schema(
   {
-    user: {
+    author: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: [true, 'User reference is required'],
@@ -36,12 +36,6 @@ const interviewExperienceSchema = new mongoose.Schema(
       required: false,
       min: [0, 'Package must be a positive number'],
       index: true,
-    },
-    college: {
-      type: String,
-      required: false,
-      trim: true,
-      maxlength: [200, 'College name cannot exceed 200 characters'],
     },
     graduationYear: {
       type: Number,
@@ -107,6 +101,20 @@ const interviewExperienceSchema = new mongoose.Schema(
     tags: {
       type: [String],
       default: [],
+    },
+    likes: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
+    views: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
+    commentsCount: {
+      type: Number,
+      default: 0,
     },
   },
   {

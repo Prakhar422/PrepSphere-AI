@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ResponsiveContainer,
@@ -29,6 +30,11 @@ import {
   Upload,
   Code2,
   LineChart,
+  Heart,
+  Bookmark,
+  MessageSquare,
+  Eye,
+  AlertTriangle
 } from "lucide-react";
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
@@ -75,9 +81,35 @@ const Dashboard = () => {
     error: null
   });
 
+  // Community and saved experiences states
+  const [savedExperiences, setSavedExperiences] = useState([]);
+  const [totalLikesGiven, setTotalLikesGiven] = useState(0);
+  const [totalBookmarkedExperiences, setTotalBookmarkedExperiences] = useState(0);
+  const [totalComments, setTotalComments] = useState(0);
+  const [loadingExperiences, setLoadingExperiences] = useState(true);
+  const [unbookmarkingId, setUnbookmarkingId] = useState(null);
+
+  const handleRemoveBookmark = async (id, e) => {
+    e.stopPropagation();
+    if (unbookmarkingId) return;
+    setUnbookmarkingId(id);
+    try {
+      const response = await api.post(`/interview-experiences/${id}/bookmark`);
+      if (response.data && response.data.success) {
+        setSavedExperiences(prev => prev.filter(exp => exp._id !== id));
+        setTotalBookmarkedExperiences(prev => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error("Error removing bookmark on dashboard:", err);
+    } finally {
+      setUnbookmarkingId(null);
+    }
+  };
+
   useEffect(() => {
     const fetchDashboardSummary = async () => {
       try {
+        setLoadingExperiences(true);
         const response = await api.get(`/dashboard/summary?t=${Date.now()}`);
         if (response.data && response.data.success) {
           setResumeSummary({
@@ -113,6 +145,10 @@ const Dashboard = () => {
 
           setReadinessVal(response.data.readiness || 0);
           setActivitiesList(response.data.activities || []);
+          setTotalLikesGiven(response.data.totalLikesGiven || 0);
+          setTotalBookmarkedExperiences(response.data.totalBookmarkedExperiences || 0);
+          setTotalComments(response.data.totalComments || 0);
+          setSavedExperiences(response.data.savedExperiences || []);
         }
       } catch (err) {
         console.error("Error fetching combined dashboard summary:", err);
@@ -122,6 +158,8 @@ const Dashboard = () => {
           loading: false,
           error: "Failed to load aptitude summary."
         }));
+      } finally {
+        setLoadingExperiences(false);
       }
     };
 
@@ -192,7 +230,8 @@ const Dashboard = () => {
     Calendar: Calendar,
     Award: Award,
     Clock: Clock,
-    MessageSquareCode: MessageSquareCode
+    MessageSquareCode: MessageSquareCode,
+    Briefcase: Briefcase
   };
 
   // Contest Mock Data
@@ -217,71 +256,9 @@ const Dashboard = () => {
     },
   ];
 
-  // Company experiences data
-  const experiences = [
-    {
-      company: "Google",
-      role: "Software Engineer Intern",
-      difficulty: "Hard",
-      rounds: 4,
-      color: "from-blue-500 to-green-500",
-    },
-    {
-      company: "Amazon",
-      role: "Systems Engineer Graduate",
-      difficulty: "Medium",
-      rounds: 3,
-      color: "from-yellow-500 to-orange-500",
-    },
-    {
-      company: "Microsoft",
-      role: "Associate Software Engineer",
-      difficulty: "Medium-Hard",
-      rounds: 4,
-      color: "from-blue-600 to-cyan-500",
-    },
-    {
-      company: "Goldman Sachs",
-      role: "Analyst (Tech Division)",
-      difficulty: "Hard",
-      rounds: 3,
-      color: "from-yellow-600 to-yellow-400",
-    },
-  ];
 
-  // Activities log data
-  const activities = [
-    {
-      desc: "Resume Uploaded & ATS Scanned",
-      time: "2 hours ago",
-      icon: FileSearch,
-      color: "text-blue-400 bg-blue-500/10",
-    },
-    {
-      desc: "Mock Technical Interview Completed",
-      time: "1 day ago",
-      icon: MessageSquareCode,
-      color: "text-purple-400 bg-purple-500/10",
-    },
-    {
-      desc: "LeetCode Weekly Contest Reminder Set",
-      time: "2 days ago",
-      icon: Calendar,
-      color: "text-emerald-400 bg-emerald-500/10",
-    },
-    {
-      desc: "Aptitude Practice Set 4 Completed",
-      time: "3 days ago",
-      icon: Brain,
-      color: "text-pink-400 bg-pink-500/10",
-    },
-    {
-      desc: "Global Coding Rank Improved to #1240",
-      time: "4 days ago",
-      icon: Award,
-      color: "text-cyan-400 bg-cyan-500/10",
-    },
-  ];
+
+
 
   // Motion framer variants
   const containerVariants = {
@@ -540,6 +517,110 @@ const Dashboard = () => {
                     </div>
                     <div className="mt-2 text-sm text-slate-400 font-medium flex items-center gap-1">
                       <span>Best performance metric</span>
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            </motion.section>
+
+            {/* Community Stats Row */}
+            <motion.section
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-6"
+            >
+              {/* Card 1: Saved Experiences */}
+              <motion.div
+                variants={itemVariants}
+                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all duration-300"
+              >
+                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                <div className="flex justify-between items-start">
+                  <span className="text-sm font-semibold text-slate-400">
+                    Saved Experiences
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                    <Bookmark className="w-4 h-4" />
+                  </div>
+                </div>
+                {loadingExperiences ? (
+                  <div className="space-y-3 mt-4">
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 flex items-baseline space-x-1.5">
+                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+                        {totalBookmarkedExperiences}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400 font-light">
+                      Experiences saved for prep
+                    </div>
+                  </>
+                )}
+              </motion.div>
+
+              {/* Card 2: Likes Given */}
+              <motion.div
+                variants={itemVariants}
+                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-red-500/25 transition-all duration-300"
+              >
+                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-red-500/20 to-transparent" />
+                <div className="flex justify-between items-start">
+                  <span className="text-sm font-semibold text-slate-400">
+                    Total Likes Given
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-red-500/10 text-red-400">
+                    <Heart className="w-4 h-4" />
+                  </div>
+                </div>
+                {loadingExperiences ? (
+                  <div className="space-y-3 mt-4">
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 flex items-baseline space-x-1.5">
+                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-rose-400">
+                        {totalLikesGiven}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400 font-light">
+                      Community feedback contributions
+                    </div>
+                  </>
+                )}
+              </motion.div>
+
+              {/* Card 3: Comments Posted */}
+              <motion.div
+                variants={itemVariants}
+                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all duration-300"
+              >
+                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
+                <div className="flex justify-between items-start">
+                  <span className="text-sm font-semibold text-slate-400">
+                    Total Comments
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
+                    <MessageSquare className="w-4 h-4" />
+                  </div>
+                </div>
+                {loadingExperiences ? (
+                  <div className="space-y-3 mt-4">
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 flex items-baseline space-x-1.5">
+                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                        {totalComments}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400 font-light">
+                      Discussion and questions posted
                     </div>
                   </>
                 )}
@@ -1249,41 +1330,97 @@ const Dashboard = () => {
                 <div>
                   <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
                     <Briefcase className="w-4 h-4 text-indigo-400" />
-                    Recent Company Experiences
+                    Saved Experiences
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {experiences.map((exp, idx) => (
-                      <div
-                        key={idx}
-                        className="p-4 bg-slate-950/40 border border-white/5 hover:border-white/15 rounded-2xl transition-all duration-200 flex flex-col justify-between h-[130px] relative group overflow-hidden"
-                      >
-                        {/* Glow left overlay */}
-                        <div
-                          className={`absolute top-0 bottom-0 left-0 w-[3px] bg-gradient-to-b ${exp.color}`}
-                        />
-                        <div>
-                          <div className="flex justify-between items-start">
-                            <h4 className="text-sm font-semibold text-white pl-2.5">
-                              {exp.company}
-                            </h4>
-                            <span className="text-xs text-indigo-300 font-bold uppercase tracking-wider">
-                              {exp.difficulty}
-                            </span>
+                    {loadingExperiences ? (
+                      [1, 2].map((i) => (
+                        <div key={i} className="p-4 bg-slate-950/40 border border-white/5 rounded-2xl h-[130px] flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-1/3" />
+                            <Skeleton className="h-3.5 w-1/2" />
+                            <Skeleton className="h-3 w-1/4" />
                           </div>
-                          <p className="text-sm text-slate-400 mt-1.5 pl-2.5">
-                            {exp.role}
-                          </p>
-                          <span className="block text-sm text-slate-400 mt-0.5 pl-2.5">
-                            {exp.rounds} technical rounds
-                          </span>
+                          <Skeleton className="h-5 w-24" />
                         </div>
-                        <button className="flex items-center gap-0.5 text-sm font-medium text-indigo-400 group-hover:text-indigo-300 transition-colors w-fit pl-2.5 mt-2 cursor-pointer focus:outline-none">
-                          Read Experience
-                          <ChevronRight className="w-3.5 h-3.5" />
+                      ))
+                    ) : savedExperiences.length === 0 ? (
+                      <div className="col-span-1 sm:col-span-2 flex flex-col items-center justify-center p-6 bg-slate-950/20 border border-dashed border-white/5 rounded-2xl text-center min-h-[140px]">
+                        <Bookmark className="w-8 h-8 text-slate-500/40 mb-2" />
+                        <h4 className="text-sm font-semibold text-white">No Saved Experiences</h4>
+                        <p className="text-xs text-slate-400 max-w-sm mt-1">
+                          Bookmark interview experiences to keep them here for quick preparation.
+                        </p>
+                        <button
+                          onClick={() => navigate("/interview-experiences")}
+                          className="mt-3 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer"
+                        >
+                          Browse Experiences
                         </button>
                       </div>
-                    ))}
+                    ) : (
+                      savedExperiences.map((exp, idx) => {
+                        let diffColor = "from-emerald-500 to-teal-500";
+                        if (exp.difficulty === "Medium") diffColor = "from-amber-500 to-orange-500";
+                        if (exp.difficulty === "Hard") diffColor = "from-red-500 to-rose-500";
+
+                        // Calculate rounds from populated fields or fall back to 3
+                        let roundsCount = 0;
+                        if (exp.onlineAssessment) roundsCount++;
+                        if (exp.technicalRound1) roundsCount++;
+                        if (exp.technicalRound2) roundsCount++;
+                        if (exp.technicalRound3) roundsCount++;
+                        if (exp.hrRound) roundsCount++;
+                        if (roundsCount === 0) roundsCount = 3; // fallback
+
+                        return (
+                          <div
+                            key={exp._id || idx}
+                            onClick={() => navigate(`/interview-experiences/${exp._id}`)}
+                            className="p-4 bg-slate-950/40 border border-white/5 hover:border-white/15 rounded-2xl transition-all duration-200 flex flex-col justify-between h-[130px] relative group overflow-hidden cursor-pointer"
+                          >
+                            {/* Glow left overlay */}
+                            <div
+                              className={`absolute top-0 bottom-0 left-0 w-[3px] bg-gradient-to-b ${diffColor}`}
+                            />
+                            <div>
+                              <div className="flex justify-between items-start">
+                                <h4 className="text-sm font-semibold text-white pl-2.5 truncate max-w-[70%]">
+                                  {exp.company}
+                                </h4>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider font-mono">
+                                    {exp.difficulty}
+                                  </span>
+                                  <button
+                                    onClick={(e) => handleRemoveBookmark(exp._id, e)}
+                                    disabled={unbookmarkingId === exp._id}
+                                    className="p-1 rounded bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer transition-all disabled:opacity-50"
+                                    title="Remove Bookmark"
+                                  >
+                                    <Bookmark className="w-3.5 h-3.5 fill-current text-indigo-400" />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-400 mt-1.5 pl-2.5 truncate">
+                                {exp.role}
+                              </p>
+                              <span className="block text-xs text-slate-500 mt-0.5 pl-2.5 font-light">
+                                {roundsCount} technical rounds
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/interview-experiences/${exp._id}`)}
+                              className="flex items-center gap-0.5 text-xs font-semibold text-indigo-400 group-hover:text-indigo-300 transition-colors w-fit pl-2.5 mt-2 cursor-pointer focus:outline-none"
+                            >
+                              Read Experience
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>

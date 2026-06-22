@@ -12,6 +12,7 @@ import QuizReport from "./pages/QuizReport";
 import MockInterview from "./pages/MockInterview";
 import CodingJourney from "./pages/CodingJourney";
 import InterviewExperiences from "./pages/InterviewExperiences";
+import InterviewExperienceDetail from "./pages/InterviewExperienceDetail";
 import Settings from "./pages/Settings";
 import OAuthSuccess from "./pages/OAuthSuccess";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -104,6 +105,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <InterviewExperiences />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/interview-experiences/:id"
+            element={
+              <ProtectedRoute>
+                <InterviewExperienceDetail />
               </ProtectedRoute>
             }
           />

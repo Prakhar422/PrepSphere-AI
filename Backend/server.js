@@ -2,6 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/db.js';
+import mongoose from 'mongoose';
+import InterviewExperience from './models/InterviewExperience.js';
 import authRoutes from './routes/authRoutes.js';
 import resumeRoutes from './routes/resumeRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -16,6 +18,23 @@ dotenv.config();
 
 // Connect to Database
 connectDB();
+
+// Trigger legacy DB migration (user -> author) on database connect
+mongoose.connection.once('open', async () => {
+  try {
+    const count = await InterviewExperience.countDocuments({ author: { $exists: false }, user: { $exists: true } });
+    if (count > 0) {
+      console.log(`Migrating ${count} legacy interview experiences (user -> author)...`);
+      await InterviewExperience.updateMany(
+        { author: { $exists: false }, user: { $exists: true } },
+        [ { $set: { author: '$user' } } ]
+      );
+      console.log('Legacy migration completed successfully.');
+    }
+  } catch (err) {
+    console.error('Error during legacy user->author migration:', err);
+  }
+});
 
 const app = express();
 

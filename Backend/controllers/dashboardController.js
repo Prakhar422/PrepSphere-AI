@@ -1,6 +1,11 @@
 import ResumeAnalysis from '../models/ResumeAnalysis.js';
 import QuizAttempt from '../models/QuizAttempt.js';
 import InterviewSession from '../models/InterviewSession.js';
+import InterviewExperience from '../models/InterviewExperience.js';
+import Like from '../models/Like.js';
+import Bookmark from '../models/Bookmark.js';
+import Comment from '../models/Comment.js';
+import Report from '../models/Report.js';
 import { calculateInterviewStreak } from '../utils/streakUtility.js';
 
 /**
@@ -466,8 +471,87 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
       }
     }
 
+    // 9.5. Build Interview Experience Activities list
+    const myExperiences = await InterviewExperience.find({ author: userId }).sort({ createdAt: -1 });
+    const experienceActivities = [];
+    for (const exp of myExperiences) {
+      experienceActivities.push({
+        desc: `Shared a ${exp.company} ${exp.role} interview experience.`,
+        detail: `Verdict: ${exp.result} | Package: ${exp.package ? `${exp.package} LPA` : "N/A"}`,
+        icon: "Briefcase",
+        color: "text-emerald-400 bg-emerald-500/10",
+        timestamp: exp.createdAt
+      });
+    }
+
+    const userLikes = await Like.find({ user: userId }).populate('experience', 'company role').lean();
+    const userBookmarks = await Bookmark.find({ user: userId }).populate({
+      path: 'experience',
+      populate: { path: 'author', select: 'name profileImage college' }
+    }).lean();
+    const userComments = await Comment.find({ user: userId }).populate('experience', 'company role').lean();
+    const userReports = await Report.find({ user: userId }).populate('experience', 'company role').lean();
+
+    const likedSet = new Set(userLikes.map(l => l.experience?._id?.toString()).filter(Boolean));
+    const savedExperiences = userBookmarks
+      .map(b => b.experience)
+      .filter(Boolean)
+      .map(e => ({
+        ...e,
+        isBookmarked: true,
+        isLiked: likedSet.has(e._id?.toString())
+      }));
+
+    userLikes.forEach(like => {
+      if (like.experience) {
+        experienceActivities.push({
+          desc: `Liked ${like.experience.company}'s interview experience`,
+          detail: `Role: ${like.experience.role}`,
+          icon: "Heart",
+          color: "text-red-400 bg-red-500/10",
+          timestamp: like.createdAt
+        });
+      }
+    });
+
+    userBookmarks.forEach(b => {
+      if (b.experience) {
+        experienceActivities.push({
+          desc: `Bookmarked ${b.experience.company}'s interview experience`,
+          detail: `Role: ${b.experience.role}`,
+          icon: "Bookmark",
+          color: "text-indigo-400 bg-indigo-500/10",
+          timestamp: b.createdAt
+        });
+      }
+    });
+
+    userComments.forEach(c => {
+      if (c.experience) {
+        experienceActivities.push({
+          desc: `Commented on ${c.experience.company}'s interview experience`,
+          detail: `"${c.content.length > 35 ? c.content.substring(0, 35) + '...' : c.content}"`,
+          icon: "MessageSquare",
+          color: "text-pink-400 bg-pink-500/10",
+          timestamp: c.createdAt
+        });
+      }
+    });
+
+    userReports.forEach(r => {
+      if (r.experience) {
+        experienceActivities.push({
+          desc: `Reported ${r.experience.company}'s interview experience`,
+          detail: `Reason: ${r.reason}`,
+          icon: "AlertTriangle",
+          color: "text-yellow-400 bg-yellow-500/10",
+          timestamp: r.createdAt
+        });
+      }
+    });
+
     // Merge and sort all activities chronologically, format relative times
-    const combinedActivities = [...resumeActivities, ...aptitudeActivities, ...interviewActivities]
+    const combinedActivities = [...resumeActivities, ...aptitudeActivities, ...interviewActivities, ...experienceActivities]
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .map(act => ({
         desc: act.desc,
@@ -479,6 +563,11 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
+      totalExperiencesShared: myExperiences.length,
+      totalLikesGiven: userLikes.length,
+      totalBookmarkedExperiences: savedExperiences.length,
+      totalComments: userComments.length,
+      savedExperiences,
       interviewPracticeStreak,
       resumeSummary: {
         hasResume,
