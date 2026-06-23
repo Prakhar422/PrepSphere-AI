@@ -32,8 +32,12 @@ import {
   RefreshCw,
   ExternalLink,
   ChevronDown,
+  ChevronUp,
   Info,
+  X,
+  Loader2,
 } from "lucide-react";
+import { generateQuestion as generateQuestionService } from "../services/codingJourneyService";
 import {
   ResponsiveContainer,
   BarChart,
@@ -400,6 +404,126 @@ const CodingJourney = () => {
   // Demo Control Panel States
   const [isEmptyState, setIsEmptyState] = useState(false);
 
+  // View switch mode ("dashboard" | "generator")
+  const [viewMode, setViewMode] = useState("dashboard");
+
+  // Question Generator states
+  const [companyInput, setCompanyInput] = useState("");
+  const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
+  const companyDropdownRef = useRef(null);
+
+  const [roleInput, setRoleInput] = useState("");
+  const [showRoleSuggestions, setShowRoleSuggestions] = useState(false);
+  const roleDropdownRef = useRef(null);
+
+  const [difficulty, setDifficulty] = useState("Easy");
+  const [topic, setTopic] = useState("Arrays");
+  const [language, setLanguage] = useState("C++");
+  const [ctcInput, setCtcInput] = useState("");
+  const [ctcError, setCtcError] = useState("");
+
+  const [loadingQuestion, setLoadingQuestion] = useState(false);
+  const [generatedQuestion, setGeneratedQuestion] = useState(null);
+  const [errorQuestion, setErrorQuestion] = useState(null);
+  const [hintsExpanded, setHintsExpanded] = useState(false);
+  const [visibleHintsCount, setVisibleHintsCount] = useState(0);
+  const [generatedTitles, setGeneratedTitles] = useState([]);
+
+  // Auto-filtering suggestions
+  const filteredCompaniesList = useMemo(() => {
+    const query = companyInput.trim().toLowerCase();
+    const baseSuggestions = ["Google", "Microsoft", "Amazon", "Adobe", "Atlassian", "TCS", "Infosys"];
+    if (!query) return baseSuggestions;
+    return baseSuggestions.filter(c => c.toLowerCase().includes(query));
+  }, [companyInput]);
+
+  const filteredRolesList = useMemo(() => {
+    const query = roleInput.trim().toLowerCase();
+    const baseSuggestions = ["Software Engineer", "SDE Intern", "Frontend Developer", "Backend Developer", "Full Stack Developer"];
+    if (!query) return baseSuggestions;
+    return baseSuggestions.filter(r => r.toLowerCase().includes(query));
+  }, [roleInput]);
+
+  // Click outside to close combobox suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (companyDropdownRef.current && !companyDropdownRef.current.contains(event.target)) {
+        setShowCompanySuggestions(false);
+      }
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target)) {
+        setShowRoleSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Format CTC on blur
+  const handleCtcBlur = () => {
+    let cleaned = ctcInput.trim();
+    if (!cleaned) return;
+    
+    if (cleaned.toLowerCase().endsWith('lpa')) {
+      cleaned = cleaned.substring(0, cleaned.length - 3).trim();
+    }
+    
+    const isValid = /^\d+(?:\.\d{1,2})?$/.test(cleaned) && parseFloat(cleaned) > 0;
+    if (isValid) {
+      setCtcInput(`${parseFloat(cleaned)} LPA`);
+      setCtcError("");
+    } else {
+      setCtcError("Please enter a positive number with max 2 decimal places (e.g. 12, 7.5).");
+    }
+  };
+
+  // Generate Question handler
+  const handleGenerateQuestion = async () => {
+    if (!companyInput.trim()) {
+      setCtcError("Company name is required.");
+      return;
+    }
+    if (!roleInput.trim()) {
+      setCtcError("Role is required.");
+      return;
+    }
+    if (!ctcInput.trim() || ctcError) {
+      setCtcError("Valid Target CTC is required.");
+      return;
+    }
+
+    setLoadingQuestion(true);
+    setErrorQuestion(null);
+    setHintsExpanded(false);
+    setVisibleHintsCount(0);
+
+    try {
+      const payload = {
+        company: companyInput.trim(),
+        role: roleInput.trim(),
+        difficulty,
+        topic,
+        language,
+        ctc: ctcInput.trim()
+      };
+
+      const response = await generateQuestionService(payload);
+      
+      if (response.success && response.data) {
+        setGeneratedQuestion(response.data);
+        setGeneratedTitles(prev => [...prev, response.data.title]);
+      } else {
+        setErrorQuestion(response.message || "Failed to generate question.");
+      }
+    } catch (err) {
+      console.error("Failed to generate question:", err);
+      setErrorQuestion(err.response?.data?.message || err.message || "An error occurred while generating the question.");
+    } finally {
+      setLoadingQuestion(false);
+    }
+  };
+
   // Core Data States (Dynamic local simulation)
   const [problems, setProblems] = useState(INITIAL_PROBLEMS);
   const [selectedProblem, setSelectedProblem] = useState(null);
@@ -763,329 +887,242 @@ const CodingJourney = () => {
               </div>
             </section>
 
-            {isEmptyState ? (
-              /* EMPTY STATE VIEW */
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col items-center justify-center p-16 bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-xl text-center max-w-lg mx-auto space-y-5 shadow-lg"
+            {/* Navigation Tabs */}
+            <div className="flex border-b border-white/10 gap-6 mb-6 text-left">
+              <button
+                onClick={() => setViewMode("dashboard")}
+                className={`pb-3 text-sm font-bold transition-all relative cursor-pointer focus:outline-none ${
+                  viewMode === "dashboard" ? "text-indigo-400 font-extrabold" : "text-slate-400 hover:text-slate-200"
+                }`}
               >
-                <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <Code2 className="w-8 h-8" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold text-white">
-                    Start Your Coding Journey
-                  </h3>
-                  <p className="text-sm text-slate-400 leading-relaxed font-light max-w-xs mx-auto">
-                    Solve your first coding problem to unlock analytics, topic
-                    masteries, heatmaps, and progress tracking metrics.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsEmptyState(false)}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-sm font-bold transition-all cursor-pointer shadow-lg shadow-indigo-500/25 hover:scale-[1.01]"
+                Practice Dashboard
+                {viewMode === "dashboard" && (
+                  <motion.div
+                    layoutId="activeTabBorder"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-500"
+                  />
+                )}
+              </button>
+              <button
+                onClick={() => setViewMode("generator")}
+                className={`pb-3 text-sm font-bold transition-all relative cursor-pointer focus:outline-none ${
+                  viewMode === "generator" ? "text-indigo-400 font-extrabold" : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                AI Question Generator
+                {viewMode === "generator" && (
+                  <motion.div
+                    layoutId="activeTabBorder"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-500"
+                  />
+                )}
+              </button>
+            </div>
+
+            {viewMode === "dashboard" ? (
+              isEmptyState ? (
+                /* EMPTY STATE VIEW */
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center justify-center p-16 bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-xl text-center max-w-lg mx-auto space-y-5 shadow-lg"
                 >
-                  Start Practicing
-                </button>
-              </motion.div>
-            ) : (
-              /* POPULATED DASHBOARD VIEW */
-              <div className="space-y-8">
-                {/* STATISTICS CARDS */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Card 1: Problems Solved */}
-                  <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all">
-                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                    <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Problems Solved
-                      </span>
-                      <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-                        <AnimatedNumber value={computedStats.solvedCount} />
-                      </span>
-                    </div>
-                    <div className="mt-2 text-xs text-indigo-400 font-semibold">
-                      <span>Across All Platforms</span>
-                    </div>
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                    <Code2 className="w-8 h-8" />
                   </div>
-
-                  {/* Card 2: Streak */}
-                  <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 transition-all">
-                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
-                    <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Current Streak
-                      </span>
-                      <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
-                        <Flame className="w-4 h-4 animate-pulse" />
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-                        <AnimatedNumber value={computedStats.streak} /> Days
-                      </span>
-                    </div>
-                    <div className="mt-2 text-xs text-purple-400 font-semibold">
-                      <span>Keep the momentum going</span>
-                    </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">
+                      Start Your Coding Journey
+                    </h3>
+                    <p className="text-sm text-slate-400 leading-relaxed font-light max-w-xs mx-auto">
+                      Solve your first coding problem to unlock analytics, topic
+                      masteries, heatmaps, and progress tracking metrics.
+                    </p>
                   </div>
-
-                  {/* Card 3: Acceptance Rate */}
-                  <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all">
-                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                    <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Acceptance Rate
-                      </span>
-                      <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-                        <Target className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
-                        <AnimatedNumber value={computedStats.acceptance} />%
-                      </span>
-                    </div>
-                    <div className="mt-2 text-xs text-cyan-400 font-semibold">
-                      <span>Overall Success Rate</span>
-                    </div>
-                  </div>
-
-                  {/* Card 4: Topics Mastered */}
-                  <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all">
-                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-                    <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Topics Mastered
-                      </span>
-                      <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
-                        <Brain className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                        <AnimatedNumber value={computedStats.topicsMastered} />
-                      </span>
-                    </div>
-                    <div className="mt-2 text-xs text-pink-400 font-semibold">
-                      <span>Out of 20 Topics</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Problem solved by categories */}
-                <div
-                  id="progress-charts"
-                  className="grid grid-cols-1 lg:grid-cols-12 gap-8 scroll-mt-24"
-                >
-                  {/* Left Column (7 cols): Solving Difficulty and Weekly Practice */}
-                  <div className="lg:col-span-7 space-y-8">
-                    {/* Solving Categories (Bar chart) */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
+                  <button
+                    onClick={() => {
+                      setIsEmptyState(false);
+                      setViewMode("generator");
+                    }}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-sm font-bold transition-all cursor-pointer shadow-lg shadow-indigo-500/25 hover:scale-[1.01]"
+                  >
+                    Start Practicing
+                  </button>
+                </motion.div>
+              ) : (
+                /* POPULATED DASHBOARD VIEW */
+                <div className="space-y-8">
+                  {/* STATISTICS CARDS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* Card 1: Problems Solved */}
+                    <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all">
                       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                      <h3 className="text-base font-semibold text-white mb-4">
-                        Problems Solved by Categories
-                      </h3>
-
-                      <div className="h-[220px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={problemCategoriesChartData}
-                            margin={{
-                              top: 10,
-                              right: 10,
-                              left: -25,
-                              bottom: 0,
-                            }}
-                          >
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              stroke="rgba(255,255,255,0.05)"
-                              vertical={false}
-                            />
-                            <XAxis
-                              dataKey="name"
-                              stroke="#64748b"
-                              fontSize={10}
-                              tickLine={false}
-                              interval={0}
-                              height={60}
-                              tick={({ x, y, payload }) => {
-                                const words = payload.value.split(" ");
-
-                                return (
-                                  <g transform={`translate(${x},${y})`}>
-                                    {words.length === 1 ? (
-                                      <text
-                                        x={0}
-                                        y={15}
-                                        textAnchor="middle"
-                                        fill="#94A3B8"
-                                        fontSize={10}
-                                      >
-                                        {payload.value}
-                                      </text>
-                                    ) : (
-                                      <>
-                                        <text
-                                          x={0}
-                                          y={10}
-                                          textAnchor="middle"
-                                          fill="#94A3B8"
-                                          fontSize={10}
-                                        >
-                                          {words.slice(0, -1).join(" ")}
-                                        </text>
-
-                                        <text
-                                          x={0}
-                                          y={24}
-                                          textAnchor="middle"
-                                          fill="#94A3B8"
-                                          fontSize={10}
-                                        >
-                                          {words[words.length - 1]}
-                                        </text>
-                                      </>
-                                    )}
-                                  </g>
-                                );
-                              }}
-                            />
-                            <YAxis
-                              stroke="#64748b"
-                              fontSize={11}
-                              tickLine={false}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                background: "#080e24",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                borderRadius: "12px",
-                              }}
-                              itemStyle={{ color: "#fff" }}
-                              labelClassName="text-slate-400 font-bold"
-                            />
-                            <Bar
-                              dataKey="count"
-                              radius={[8, 8, 0, 0]}
-                              barSize={40}
-                            >
-                              {problemCategoriesChartData.map(
-                                (entry, index) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={entry.fill}
-                                  />
-                                ),
-                              )}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
+                      <div className="flex justify-between items-start">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          Problems Solved
+                        </span>
+                        <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+                          <AnimatedNumber value={computedStats.solvedCount} />
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs text-indigo-400 font-semibold">
+                        <span>Across All Platforms</span>
                       </div>
                     </div>
 
-                    {/* Weekly practice (Line chart) */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
+                    {/* Card 2: Streak */}
+                    <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 transition-all">
                       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
-                      <h3 className="text-base font-semibold text-white mb-4">
-                        Weekly Practice Consistency
-                      </h3>
+                      <div className="flex justify-between items-start">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          Current Streak
+                        </span>
+                        <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                          <Flame className="w-4 h-4 animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+                          <AnimatedNumber value={computedStats.streak} /> Days
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs text-purple-400 font-semibold">
+                        <span>Keep the momentum going</span>
+                      </div>
+                    </div>
 
-                      <div className="h-[200px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ReChartsLineChart
-                            data={weeklyPracticeData}
-                            margin={{
-                              top: 10,
-                              right: 10,
-                              left: -25,
-                              bottom: 0,
-                            }}
-                          >
-                            <defs>
-                              <linearGradient
-                                id="lineGlow"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="5%"
-                                  stopColor="#818cf8"
-                                  stopOpacity={0.2}
-                                />
-                                <stop
-                                  offset="95%"
-                                  stopColor="#818cf8"
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              stroke="rgba(255,255,255,0.05)"
-                              vertical={false}
-                            />
-                            <XAxis
-                              dataKey="name"
-                              stroke="#64748b"
-                              fontSize={11}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              stroke="#64748b"
-                              fontSize={11}
-                              tickLine={false}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                background: "#080e24",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                borderRadius: "12px",
-                              }}
-                              itemStyle={{ color: "#fff" }}
-                              labelClassName="text-slate-400 font-bold"
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="Problems"
-                              stroke="#818cf8"
-                              strokeWidth={3}
-                              dot={{
-                                r: 4,
-                                stroke: "#818cf8",
-                                strokeWidth: 2,
-                                fill: "#080e24",
-                              }}
-                              activeDot={{ r: 6, fill: "#818cf8" }}
-                            />
-                          </ReChartsLineChart>
-                        </ResponsiveContainer>
+                    {/* Card 3: Acceptance Rate */}
+                    <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all">
+                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+                      <div className="flex justify-between items-start">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          Acceptance Rate
+                        </span>
+                        <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                          <Target className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
+                          <AnimatedNumber value={computedStats.acceptance} />%
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs text-cyan-400 font-semibold">
+                        <span>Overall Success Rate</span>
+                      </div>
+                    </div>
+
+                    {/* Card 4: Topics Mastered */}
+                    <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all">
+                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
+                      <div className="flex justify-between items-start">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          Topics Mastered
+                        </span>
+                        <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
+                          <Brain className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                          <AnimatedNumber value={computedStats.topicsMastered} />
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs text-pink-400 font-semibold">
+                        <span>Out of 20 Topics</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column (5 cols): Platform Distribution & Topics Progress */}
-                  <div className="lg:col-span-5 space-y-8">
-                    {/* Problem solved by difficulty (Pie Chart) */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                      <h3 className="text-base font-semibold text-white mb-4">
-                        Problem Solved by Difficulty
-                      </h3>
+                  {/* Problem solved by categories */}
+                  <div
+                    id="progress-charts"
+                    className="grid grid-cols-1 lg:grid-cols-12 gap-8 scroll-mt-24"
+                  >
+                    {/* Left Column (7 cols): Solving Difficulty and Weekly Practice */}
+                    <div className="lg:col-span-7 space-y-8">
+                      {/* Solving Categories (Bar chart) */}
+                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
+                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                        <h3 className="text-base font-semibold text-white mb-4">
+                          Problems Solved by Categories
+                        </h3>
 
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="h-[150px] w-[150px] shrink-0">
+                        <div className="h-[220px] w-full">
                           <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                            <BarChart
+                              data={problemCategoriesChartData}
+                              margin={{
+                                top: 10,
+                                right: 10,
+                                left: -25,
+                                bottom: 0,
+                              }}
+                            >
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="rgba(255,255,255,0.05)"
+                                vertical={false}
+                              />
+                              <XAxis
+                                dataKey="name"
+                                stroke="#64748b"
+                                fontSize={10}
+                                tickLine={false}
+                                interval={0}
+                                height={60}
+                                tick={({ x, y, payload }) => {
+                                  const words = payload.value.split(" ");
+
+                                  return (
+                                    <g transform={`translate(${x},${y})`}>
+                                      {words.length === 1 ? (
+                                        <text
+                                          x={0}
+                                          y={15}
+                                          textAnchor="middle"
+                                          fill="#94A3B8"
+                                          fontSize={10}
+                                        >
+                                          {payload.value}
+                                        </text>
+                                      ) : (
+                                        <>
+                                          <text
+                                            x={0}
+                                            y={10}
+                                            textAnchor="middle"
+                                            fill="#94A3B8"
+                                            fontSize={10}
+                                          >
+                                            {words.slice(0, -1).join(" ")}
+                                          </text>
+
+                                          <text
+                                            x={0}
+                                            y={24}
+                                            textAnchor="middle"
+                                            fill="#94A3B8"
+                                            fontSize={10}
+                                          >
+                                            {words[words.length - 1]}
+                                          </text>
+                                        </>
+                                      )}
+                                    </g>
+                                  );
+                                }}
+                              />
+                              <YAxis
+                                stroke="#64748b"
+                                fontSize={11}
+                                tickLine={false}
+                              />
                               <Tooltip
                                 contentStyle={{
                                   background: "#080e24",
@@ -1093,270 +1130,754 @@ const CodingJourney = () => {
                                   borderRadius: "12px",
                                 }}
                                 itemStyle={{ color: "#fff" }}
+                                labelClassName="text-slate-400 font-bold"
                               />
-                              <Pie
-                                data={problemDifficultyChartData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={40}
-                                outerRadius={60}
-                                paddingAngle={5}
-                                dataKey="value"
+                              <Bar
+                                dataKey="count"
+                                radius={[8, 8, 0, 0]}
+                                barSize={40}
                               >
-                                {problemDifficultyChartData.map(
+                                {problemCategoriesChartData.map(
                                   (entry, index) => (
                                     <Cell
                                       key={`cell-${index}`}
-                                      fill={entry.color}
+                                      fill={entry.fill}
                                     />
                                   ),
                                 )}
-                              </Pie>
-                            </PieChart>
+                              </Bar>
+                            </BarChart>
                           </ResponsiveContainer>
                         </div>
+                      </div>
 
-                        <div className="flex-1 space-y-2 text-xs text-slate-300 w-full">
-                          {problemDifficultyChartData.map((item, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-between"
+                      {/* Weekly practice (Line chart) */}
+                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
+                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
+                        <h3 className="text-base font-semibold text-white mb-4">
+                          Weekly Practice Consistency
+                        </h3>
+
+                        <div className="h-[200px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ReChartsLineChart
+                              data={weeklyPracticeData}
+                              margin={{
+                                top: 10,
+                                right: 10,
+                                left: -25,
+                                bottom: 0,
+                              }}
                             >
-                              <div className="flex items-center space-x-2">
-                                <div
-                                  className="w-2.5 h-2.5 rounded-full"
-                                  style={{ backgroundColor: item.color }}
+                              <defs>
+                                <linearGradient
+                                  id="lineGlow"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop
+                                    offset="5%"
+                                    stopColor="#818cf8"
+                                    stopOpacity={0.2}
+                                  />
+                                  <stop
+                                    offset="95%"
+                                    stopColor="#818cf8"
+                                    stopOpacity={0}
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="rgba(255,255,255,0.05)"
+                                vertical={false}
+                              />
+                              <XAxis
+                                dataKey="name"
+                                stroke="#64748b"
+                                fontSize={11}
+                                tickLine={false}
+                              />
+                              <YAxis
+                                stroke="#64748b"
+                                fontSize={11}
+                                tickLine={false}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  background: "#080e24",
+                                  border: "1px solid rgba(255,255,255,0.1)",
+                                  borderRadius: "12px",
+                                }}
+                                itemStyle={{ color: "#fff" }}
+                                labelClassName="text-slate-400 font-bold"
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="Problems"
+                                stroke="#818cf8"
+                                strokeWidth={3}
+                                dot={{
+                                  r: 4,
+                                  stroke: "#818cf8",
+                                  strokeWidth: 2,
+                                  fill: "#080e24",
+                                }}
+                                activeDot={{ r: 6, fill: "#818cf8" }}
+                              />
+                            </ReChartsLineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column (5 cols): Platform Distribution & Topics Progress */}
+                    <div className="lg:col-span-5 space-y-8">
+                      {/* Problem solved by difficulty (Pie Chart) */}
+                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
+                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+                        <h3 className="text-base font-semibold text-white mb-4">
+                          Problem Solved by Difficulty
+                        </h3>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="h-[150px] w-[150px] shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Tooltip
+                                  contentStyle={{
+                                    background: "#080e24",
+                                    border: "1px solid rgba(255,255,255,0.1)",
+                                    borderRadius: "12px",
+                                  }}
+                                  itemStyle={{ color: "#fff" }}
                                 />
-                                <span className="font-medium text-slate-300">
-                                  {item.name}
+                                <Pie
+                                  data={problemDifficultyChartData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={40}
+                                  outerRadius={60}
+                                  paddingAngle={5}
+                                  dataKey="value"
+                                >
+                                  {problemDifficultyChartData.map(
+                                    (entry, index) => (
+                                      <Cell
+                                        key={`cell-${index}`}
+                                        fill={entry.color}
+                                      />
+                                    ),
+                                  )}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+
+                          <div className="flex-1 space-y-2 text-xs text-slate-300 w-full">
+                            {problemDifficultyChartData.map((item, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between"
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <div
+                                    className="w-2.5 h-2.5 rounded-full"
+                                    style={{ backgroundColor: item.color }}
+                                  />
+                                  <span className="font-medium text-slate-300">
+                                    {item.name}
+                                  </span>
+                                </div>
+                                <span className="font-mono font-bold text-white">
+                                  {item.value} solved
                                 </span>
                               </div>
-                              <span className="font-mono font-bold text-white">
-                                {item.value} solved
-                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Topic Progress lists */}
+                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
+                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
+                        <h3 className="text-base font-semibold text-white mb-4">
+                          Key Topic Progress
+                        </h3>
+
+                        <div className="space-y-4">
+                          {topicsProgress.map((topic, index) => (
+                            <div key={index} className="space-y-1.5">
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span className="text-slate-300">
+                                  {topic.name}
+                                </span>
+                                <span className="text-indigo-400">
+                                  {topic.percent}%
+                                </span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-white/5 relative">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${topic.percent}%` }}
+                                  transition={{
+                                    duration: 1.2,
+                                    delay: index * 0.1,
+                                  }}
+                                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RECENT ACTIVITY & ACHIEVEMENTS GRIDS */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Achievements Grid (7 columns) */}
+                    <div className="lg:col-span-7 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
+                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+
+                      <div>
+                        <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
+                          <Award className="w-5 h-5 text-cyan-400" />
+                          Practice Achievements &amp; Badges
+                        </h3>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {ACHIEVEMENTS.map((ach) => (
+                            <div
+                              key={ach.id}
+                              className={`p-4 rounded-2xl border bg-gradient-to-br flex items-center space-x-3.5 transition-all duration-300 hover:scale-[1.02] ${ach.color}`}
+                            >
+                              <div className="p-2.5 rounded-xl bg-slate-950/40 shrink-0">
+                                {ach.icon === "Flame" && (
+                                  <Flame className="w-5 h-5 animate-pulse" />
+                                )}
+                                {ach.icon === "Trophy" && (
+                                  <Trophy className="w-5 h-5" />
+                                )}
+                                {ach.icon === "CheckCircle2" && (
+                                  <CheckCircle2 className="w-5 h-5" />
+                                )}
+                                {ach.icon === "Zap" && (
+                                  <Zap className="w-5 h-5" />
+                                )}
+                                {ach.icon === "Compass" && (
+                                  <Activity className="w-5 h-5" />
+                                )}
+                                {ach.icon === "Brain" && (
+                                  <Brain className="w-5 h-5" />
+                                )}
+                              </div>
+
+                              <div className="min-w-0 flex-1 text-left space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <h4 className="text-xs sm:text-sm font-bold text-white truncate">
+                                    {ach.title}
+                                  </h4>
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    {ach.progress}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] sm:text-xs text-slate-400 font-light leading-relaxed truncate">
+                                  {ach.desc}
+                                </p>
+
+                                {/* Small progress bar */}
+                                <div className="w-full h-1 bg-slate-950/40 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-current rounded-full"
+                                    style={{ width: ach.progress }}
+                                  />
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     </div>
 
-                    {/* Topic Progress lists */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
+                    {/* Recent Activity Log (5 columns) */}
+                    <div className="lg:col-span-5 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
                       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-                      <h3 className="text-base font-semibold text-white mb-4">
-                        Key Topic Progress
-                      </h3>
 
-                      <div className="space-y-4">
-                        {topicsProgress.map((topic, index) => (
-                          <div key={index} className="space-y-1.5">
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span className="text-slate-300">
-                                {topic.name}
-                              </span>
-                              <span className="text-indigo-400">
-                                {topic.percent}%
-                              </span>
+                      <div>
+                        <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
+                          <Clock className="w-5 h-5 text-pink-400" />
+                          Recent Practice Activity Log
+                        </h3>
+
+                        <div className="relative border-l border-white/5 ml-3 pl-5 space-y-6">
+                          {recentActivities.map((act, index) => (
+                            <div
+                              key={index}
+                              className="relative text-left text-xs sm:text-sm"
+                            >
+                              {/* Bullet indicator */}
+                              <div className="absolute -left-[26px] top-1 w-2.5 h-2.5 rounded-full bg-pink-500 border border-[#050B1F]" />
+
+                              <div className="space-y-1">
+                                <p className="font-bold text-white leading-relaxed">
+                                  {act.text}
+                                </p>
+                                <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400 font-mono">
+                                  <span>{act.time}</span>
+                                  <span>&bull;</span>
+                                  <span>{act.platform}</span>
+                                  <span>&bull;</span>
+                                  <span
+                                    className={
+                                      act.difficulty === "Easy"
+                                        ? "text-emerald-400"
+                                        : "text-amber-400"
+                                    }
+                                  >
+                                    {act.difficulty}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-white/5 relative">
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${topic.percent}%` }}
-                                transition={{
-                                  duration: 1.2,
-                                  delay: index * 0.1,
-                                }}
-                                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
-                              />
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                {/* CODING HEATMAP 
-                <section className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-                  <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                  
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-indigo-400" />
-                      Annual Coding Consistency Heatmap
+              )
+            ) : (
+              /* AI QUESTION GENERATOR VIEW */
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left">
+                {/* Preference Form Panel (4 columns) */}
+                <div className="lg:col-span-4 space-y-6">
+                  <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg space-y-6">
+                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                    
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-indigo-400" />
+                      Question Details
                     </h3>
-                    <div className="flex items-center space-x-2 text-[10px] text-slate-400 font-mono">
-                      <span>Less</span>
-                      <div className="w-2.5 h-2.5 rounded-sm bg-white/[0.04]" />
-                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-950/40" />
-                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-700/60" />
-                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
-                      <span>More</span>
-                    </div>
-                  </div>
 
-                  // Heatmap Grid Wrapper 
-                  <div className="overflow-x-auto pb-2">
-                    <div className="min-w-[760px] p-2 bg-slate-950/20 rounded-2xl border border-white/5 flex gap-4">
-                      // Weekday labels 
-                      <div className="flex flex-col justify-between py-1 text-[9px] text-slate-500 font-mono h-[86px]">
-                        <span>Mon</span>
-                        <span>Wed</span>
-                        <span>Fri</span>
-                        <span>Sun</span>
+                    {/* Company Searchable Combobox */}
+                    <div className="relative space-y-1.5" ref={companyDropdownRef}>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Company
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={companyInput}
+                          onChange={(e) => {
+                            setCompanyInput(e.target.value);
+                            setShowCompanySuggestions(true);
+                          }}
+                          onFocus={() => setShowCompanySuggestions(true)}
+                          placeholder="e.g. Google, NVIDIA"
+                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3.5 py-2.5 pr-9 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60 placeholder-slate-500"
+                        />
+                        {companyInput && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCompanyInput("");
+                              setShowCompanySuggestions(false);
+                            }}
+                            className="absolute right-2.5 text-slate-400 hover:text-white cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
+                      {showCompanySuggestions && filteredCompaniesList.length > 0 && (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-900 border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                          {filteredCompaniesList.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => {
+                                setCompanyInput(c);
+                                setShowCompanySuggestions(false);
+                              }}
+                              className="w-full text-left px-3.5 py-2.5 text-xs sm:text-sm text-slate-300 hover:bg-indigo-500/10 hover:text-white transition-colors cursor-pointer"
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Role Searchable Combobox */}
+                    <div className="relative space-y-1.5" ref={roleDropdownRef}>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Target Role
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={roleInput}
+                          onChange={(e) => {
+                            setRoleInput(e.target.value);
+                            setShowRoleSuggestions(true);
+                          }}
+                          onFocus={() => setShowRoleSuggestions(true)}
+                          placeholder="e.g. Frontend Developer"
+                          className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3.5 py-2.5 pr-9 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60 placeholder-slate-500"
+                        />
+                        {roleInput && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRoleInput("");
+                              setShowRoleSuggestions(false);
+                            }}
+                            className="absolute right-2.5 text-slate-400 hover:text-white cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      {showRoleSuggestions && filteredRolesList.length > 0 && (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-900 border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                          {filteredRolesList.map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => {
+                                setRoleInput(r);
+                                setShowRoleSuggestions(false);
+                              }}
+                              className="w-full text-left px-3.5 py-2.5 text-xs sm:text-sm text-slate-300 hover:bg-indigo-500/10 hover:text-white transition-colors cursor-pointer"
+                            >
+                              {r}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Difficulty Dropdown */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Difficulty
+                      </label>
+                      <select
+                        value={difficulty}
+                        onChange={(e) => setDifficulty(e.target.value)}
+                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60 font-medium"
+                      >
+                        <option value="Easy" className="bg-slate-900">Easy</option>
+                        <option value="Medium" className="bg-slate-900">Medium</option>
+                        <option value="Hard" className="bg-slate-900">Hard</option>
+                      </select>
+                    </div>
+
+                    {/* Topic Dropdown */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Topic
+                      </label>
+                      <select
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60 font-medium"
+                      >
+                        {["Arrays", "Strings", "Linked Lists", "Trees", "Graphs", "Dynamic Programming", "Binary Search", "Sliding Window", "Heap", "Greedy"].map(t => (
+                          <option key={t} value={t} className="bg-slate-900">{t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Programming Language Dropdown */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Programming Language
+                      </label>
+                      <select
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60 font-medium"
+                      >
+                        {["C++", "Java", "Python", "JavaScript"].map(l => (
+                          <option key={l} value={l} className="bg-slate-900">{l}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Target CTC Input */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Target CTC
+                      </label>
+                      <input
+                        type="text"
+                        value={ctcInput}
+                        onChange={(e) => setCtcInput(e.target.value)}
+                        onBlur={handleCtcBlur}
+                        placeholder="e.g. 12 or 7.5 LPA"
+                        className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500/60 placeholder-slate-500"
+                      />
+                      {ctcError && (
+                        <p className="text-[10px] text-red-400 font-semibold mt-1">{ctcError}</p>
+                      )}
+                    </div>
+
+                    {/* Action button */}
+                    <button
+                      type="button"
+                      disabled={loadingQuestion}
+                      onClick={handleGenerateQuestion}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-sm font-bold transition-all cursor-pointer shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01]"
+                    >
+                      {loadingQuestion ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Generating Question...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Generate Question</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Generated Question Display Panel (8 columns) */}
+                <div className="lg:col-span-8 space-y-6">
+                  {loadingQuestion ? (
+                    /* SKELETON LOADER */
+                    <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg animate-pulse space-y-6">
+                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                      <div className="flex justify-between items-center">
+                        <div className="h-6 w-1/3 bg-white/10 rounded-lg" />
+                        <div className="h-5 w-16 bg-white/10 rounded-full" />
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="h-4 w-12 bg-white/10 rounded-full" />
+                        <div className="h-4 w-16 bg-white/10 rounded-full" />
+                      </div>
+                      <div className="space-y-2.5 mt-4">
+                        <div className="h-4 w-full bg-white/10 rounded-lg" />
+                        <div className="h-4 w-full bg-white/10 rounded-lg" />
+                        <div className="h-4 w-4/5 bg-white/10 rounded-lg" />
+                      </div>
+                      <div className="space-y-4 pt-4">
+                        <div className="h-20 w-full bg-white/5 rounded-xl border border-white/5" />
+                        <div className="h-20 w-full bg-white/5 rounded-xl border border-white/5" />
+                      </div>
+                    </div>
+                  ) : errorQuestion ? (
+                    /* ERROR CARD */
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-8 relative overflow-hidden text-center space-y-4">
+                      <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 mx-auto">
+                        <Info className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="text-base font-bold text-white">Generation Failed</h4>
+                        <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+                          {errorQuestion}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleGenerateQuestion}
+                        className="px-6 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  ) : generatedQuestion ? (
+                    /* QUESTION CONTENT VIEW */
+                    <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg space-y-6">
+                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                       
-                      //Grid cells 
-                      <div className="flex-1 flex flex-col justify-between">
-                        //Month labels header 
-                        <div className="flex justify-between text-[9px] text-slate-500 font-mono mb-2 px-1">
-                          <span>Jul</span>
-                          <span>Aug</span>
-                          <span>Sep</span>
-                          <span>Oct</span>
-                          <span>Nov</span>
-                          <span>Dec</span>
-                          <span>Jan</span>
-                          <span>Feb</span>
-                          <span>Mar</span>
-                          <span>Apr</span>
-                          <span>May</span>
-                          <span>Jun</span>
+                      {/* Title & Badge */}
+                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/5 pb-4">
+                        <div className="space-y-1">
+                          <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                            {generatedQuestion.title}
+                          </h2>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <span
+                              className={`px-2.5 py-0.5 rounded border text-[9px] uppercase font-bold tracking-wider ${
+                                generatedQuestion.difficulty === "Easy"
+                                  ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                                  : generatedQuestion.difficulty === "Medium"
+                                    ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                                    : "text-red-400 bg-red-500/10 border-red-500/20"
+                              }`}
+                            >
+                              {generatedQuestion.difficulty}
+                            </span>
+                            <span className="px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-bold text-slate-300 font-mono">
+                              {generatedQuestion.topic}
+                            </span>
+                          </div>
                         </div>
+                        
+                        <button
+                          onClick={handleGenerateQuestion}
+                          disabled={loadingQuestion}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-slate-200 text-xs font-bold cursor-pointer transition-all"
+                        >
+                          {loadingQuestion ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          )}
+                          <span>Generate Another</span>
+                        </button>
+                      </div>
 
-                        //Contribution Board Grid 
-                        <div className="heatmap-grid h-[86px] w-full">
-                          {heatmapData.map((count, index) => {
-                            let bgColor = "bg-white/[0.04]";
-                            if (count === 1) bgColor = "bg-emerald-950/40 border border-emerald-900/10";
-                            if (count === 2) bgColor = "bg-emerald-800/40 border border-emerald-700/20";
-                            if (count === 3) bgColor = "bg-emerald-600/70 shadow-[0_0_5px_rgba(16,185,129,0.15)]";
-                            if (count >= 4) bgColor = "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.3)]";
+                      {/* Tags */}
+                      {generatedQuestion.tags && generatedQuestion.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {generatedQuestion.tags.map((t, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-indigo-500/5 border border-indigo-500/10 text-indigo-300/80 rounded-lg px-2 py-0.5 text-[10px]"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
-                            return (
+                      {/* Description */}
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                          Problem Description
+                        </h4>
+                        <p className="whitespace-pre-wrap font-sans text-slate-300 leading-relaxed text-sm sm:text-base">
+                          {generatedQuestion.description}
+                        </p>
+                      </div>
+
+                      {/* Examples */}
+                      {generatedQuestion.examples && generatedQuestion.examples.length > 0 && (
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                            Examples
+                          </h4>
+                          <div className="space-y-3">
+                            {generatedQuestion.examples.map((ex, idx) => (
                               <div
-                                key={index}
-                                className={`w-[9px] h-[9px] rounded-[1.5px] transition-colors hover:scale-125 duration-100 ${bgColor}`}
-                                title={`Submission count code: ${count}`}
-                              />
-                            );
-                          })}
+                                key={idx}
+                                className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 font-mono text-xs text-left text-slate-300 space-y-2.5"
+                              >
+                                <p className="font-semibold text-indigo-400">Example {idx + 1}:</p>
+                                <p><span className="text-slate-500 font-bold">Input:</span> {ex.input}</p>
+                                <p><span className="text-slate-500 font-bold">Output:</span> {ex.output}</p>
+                                {ex.explanation && (
+                                  <p><span className="text-slate-500 font-bold">Explanation:</span> {ex.explanation}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Constraints */}
+                      {generatedQuestion.constraints && generatedQuestion.constraints.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                            Constraints
+                          </h4>
+                          <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-300 font-mono pl-1">
+                            {generatedQuestion.constraints.map((c, idx) => (
+                              <li key={idx}>{c}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Hints System */}
+                      {generatedQuestion.hints && generatedQuestion.hints.length > 0 && (
+                        <div className="border-t border-white/5 pt-4 space-y-3">
+                          {!hintsExpanded ? (
+                            <button
+                              onClick={() => {
+                                setHintsExpanded(true);
+                                setVisibleHintsCount(1);
+                              }}
+                              className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 text-xs font-bold cursor-pointer"
+                            >
+                              <span>💡 Show Hints</span>
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <div className="space-y-3 text-left">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                                  💡 Hints
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    setHintsExpanded(false);
+                                    setVisibleHintsCount(0);
+                                  }}
+                                  className="text-slate-400 hover:text-white text-xs cursor-pointer"
+                                >
+                                  Hide
+                                </button>
+                              </div>
+
+                              <div className="space-y-2">
+                                {generatedQuestion.hints.slice(0, visibleHintsCount).map((hint, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="bg-white/[0.01] border border-white/5 rounded-xl p-3.5 text-xs text-slate-300 leading-relaxed font-sans"
+                                  >
+                                    <p className="font-semibold text-indigo-400 mb-1">Hint {idx + 1}</p>
+                                    <p>{hint}</p>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {visibleHintsCount < generatedQuestion.hints.length && (
+                                <button
+                                  onClick={() => setVisibleHintsCount(prev => prev + 1)}
+                                  className="text-indigo-400 hover:text-indigo-300 text-xs font-bold cursor-pointer"
+                                >
+                                  Show Next Hint
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Complexities */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-white/5 pt-4 text-xs font-mono text-slate-300">
+                        <div className="space-y-1 bg-slate-950/20 rounded-xl p-3 border border-white/5">
+                          <span className="text-slate-500 block">Expected Time Complexity</span>
+                          <span className="font-bold text-white">{generatedQuestion.expectedTimeComplexity}</span>
+                        </div>
+                        <div className="space-y-1 bg-slate-950/20 rounded-xl p-3 border border-white/5">
+                          <span className="text-slate-500 block">Expected Space Complexity</span>
+                          <span className="font-bold text-white">{generatedQuestion.expectedSpaceComplexity}</span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </section> */}
-
-                {/* RECENT ACTIVITY & ACHIEVEMENTS GRIDS */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  {/* Achievements Grid (7 columns) */}
-                  <div className="lg:col-span-7 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
-                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-
-                    <div>
-                      <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
-                        <Award className="w-5 h-5 text-cyan-400" />
-                        Practice Achievements &amp; Badges
-                      </h3>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {ACHIEVEMENTS.map((ach) => (
-                          <div
-                            key={ach.id}
-                            className={`p-4 rounded-2xl border bg-gradient-to-br flex items-center space-x-3.5 transition-all duration-300 hover:scale-[1.02] ${ach.color}`}
-                          >
-                            <div className="p-2.5 rounded-xl bg-slate-950/40 shrink-0">
-                              {ach.icon === "Flame" && (
-                                <Flame className="w-5 h-5 animate-pulse" />
-                              )}
-                              {ach.icon === "Trophy" && (
-                                <Trophy className="w-5 h-5" />
-                              )}
-                              {ach.icon === "CheckCircle2" && (
-                                <CheckCircle2 className="w-5 h-5" />
-                              )}
-                              {ach.icon === "Zap" && (
-                                <Zap className="w-5 h-5" />
-                              )}
-                              {ach.icon === "Compass" && (
-                                <Activity className="w-5 h-5" />
-                              )}
-                              {ach.icon === "Brain" && (
-                                <Brain className="w-5 h-5" />
-                              )}
-                            </div>
-
-                            <div className="min-w-0 flex-1 text-left space-y-1">
-                              <div className="flex justify-between items-center">
-                                <h4 className="text-xs sm:text-sm font-bold text-white truncate">
-                                  {ach.title}
-                                </h4>
-                                <span className="text-[10px] font-mono text-slate-400">
-                                  {ach.progress}
-                                </span>
-                              </div>
-                              <p className="text-[10px] sm:text-xs text-slate-400 font-light leading-relaxed truncate">
-                                {ach.desc}
-                              </p>
-
-                              {/* Small progress bar */}
-                              <div className="w-full h-1 bg-slate-950/40 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-current rounded-full"
-                                  style={{ width: ach.progress }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                  ) : (
+                    /* EMPTY STATE PLACEHOLDER */
+                    <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-16 text-center space-y-4">
+                      <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mx-auto">
+                        <Code2 className="w-8 h-8" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-bold text-white">Generate your first AI coding challenge.</h3>
+                        <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
+                          Select your preferences and click <strong>Generate Question</strong>.
+                        </p>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Recent Activity Log (5 columns) */}
-                  <div className="lg:col-span-5 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
-                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-
-                    <div>
-                      <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
-                        <Clock className="w-5 h-5 text-pink-400" />
-                        Recent Practice Activity Log
-                      </h3>
-
-                      <div className="relative border-l border-white/5 ml-3 pl-5 space-y-6">
-                        {recentActivities.map((act, index) => (
-                          <div
-                            key={index}
-                            className="relative text-left text-xs sm:text-sm"
-                          >
-                            {/* Bullet indicator */}
-                            <div className="absolute -left-[26px] top-1 w-2.5 h-2.5 rounded-full bg-pink-500 border border-[#050B1F]" />
-
-                            <div className="space-y-1">
-                              <p className="font-bold text-white leading-relaxed">
-                                {act.text}
-                              </p>
-                              <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400 font-mono">
-                                <span>{act.time}</span>
-                                <span>&bull;</span>
-                                <span>{act.platform}</span>
-                                <span>&bull;</span>
-                                <span
-                                  className={
-                                    act.difficulty === "Easy"
-                                      ? "text-emerald-400"
-                                      : "text-amber-400"
-                                  }
-                                >
-                                  {act.difficulty}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             )}

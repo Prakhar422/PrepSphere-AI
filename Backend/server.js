@@ -11,6 +11,8 @@ import aptitudeRoutes from './routes/aptitudeRoutes.js';
 import interviewRoutes from './routes/interviewRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import interviewExperienceRoutes from './routes/interviewExperienceRoutes.js';
+import codingJourneyRoutes from './routes/codingJourneyRoutes.js';
+
 
 
 // Load environment variables
@@ -56,6 +58,8 @@ app.use('/api/aptitude', aptitudeRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/interview-experiences', interviewExperienceRoutes);
+app.use('/api/coding-journey', codingJourneyRoutes);
+
 
 // Fallback Route (404 Not Found)
 app.use((req, res, next) => {
