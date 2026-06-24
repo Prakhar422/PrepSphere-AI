@@ -6,6 +6,7 @@ import Like from '../models/Like.js';
 import Bookmark from '../models/Bookmark.js';
 import Comment from '../models/Comment.js';
 import Report from '../models/Report.js';
+import CodingSubmission from '../models/CodingSubmission.js';
 import { calculateInterviewStreak } from '../utils/streakUtility.js';
 
 /**
@@ -295,6 +296,28 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
 
     const interviewPracticeStreak = await calculateInterviewStreak(completedInterviews);
 
+    // 3.5. Fetch Coding Journey submissions
+    const codingSubmissions = await CodingSubmission.find({ user: userId })
+      .populate('question', 'title topic difficulty')
+      .sort({ submittedAt: -1 })
+      .lean();
+
+    const uniqueCodingAttemptedIds = new Set(codingSubmissions.map(s => s.question?._id?.toString()).filter(Boolean));
+    const totalCodingAttempted = uniqueCodingAttemptedIds.size;
+
+    const uniqueCodingSolvedIds = new Set(
+      codingSubmissions
+        .filter(s => s.status === 'passed')
+        .map(s => s.question?._id?.toString())
+        .filter(Boolean)
+    );
+    const totalCodingSolved = uniqueCodingSolvedIds.size;
+
+    const totalPassedCodingSubmissions = codingSubmissions.filter(s => s.status === 'passed').length;
+    const likelyAcceptanceRate = codingSubmissions.length > 0
+      ? Math.round((totalPassedCodingSubmissions / codingSubmissions.length) * 100)
+      : 0;
+
     // 4. Calculate Placement Readiness
     // Weights: Resume (30%), Aptitude (30%), Mock Interview (40%)
     let readiness = 0;
@@ -550,8 +573,20 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
       }
     });
 
+    // Build Coding Journey activities list
+    const codingActivities = codingSubmissions.map(sub => {
+      const verdictText = sub.status === 'passed' ? 'Likely Accepted' : sub.status === 'partial' ? 'Partially Correct' : 'Likely Wrong Answer';
+      return {
+        desc: `Submitted solution for ${sub.question?.title || 'Coding Challenge'}`,
+        detail: `Verdict: ${verdictText} | Score: ${sub.score}/100`,
+        icon: "Code2",
+        color: sub.status === 'passed' ? "text-emerald-400 bg-emerald-500/10" : sub.status === 'partial' ? "text-amber-400 bg-amber-500/10" : "text-red-400 bg-red-500/10",
+        timestamp: sub.submittedAt
+      };
+    });
+
     // Merge and sort all activities chronologically, format relative times
-    const combinedActivities = [...resumeActivities, ...aptitudeActivities, ...interviewActivities, ...experienceActivities]
+    const combinedActivities = [...resumeActivities, ...aptitudeActivities, ...interviewActivities, ...experienceActivities, ...codingActivities]
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .map(act => ({
         desc: act.desc,
@@ -605,6 +640,12 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
           communicationScore: latestInterview.report ? latestInterview.report.communicationScore : 0
         } : null,
         interviewPracticeStreak
+      },
+      codingSummary: {
+        totalAttempted: totalCodingAttempted,
+        totalSolved: totalCodingSolved,
+        likelyAcceptanceRate,
+        totalSubmissions: codingSubmissions.length
       },
       readiness,
       activities: combinedActivities.slice(0, 10)

@@ -1,10 +1,14 @@
 import express from 'express';
-import { generateQuestion } from '../controllers/codingJourneyController.js';
+import { generateQuestion, submitCode, getSubmissionsByQuestion, getCodingDashboard } from '../controllers/codingJourneyController.js';
 import { protect } from '../middleware/authMiddleware.js';
-import { rateLimiter } from '../middleware/rateLimiter.js';
+import { rateLimiter, submissionRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
 router.post('/generate-question', protect, rateLimiter, generateQuestion);
+router.post('/submit', protect, submissionRateLimiter, submitCode);
+router.get('/submissions/:questionId', protect, getSubmissionsByQuestion);
+router.get('/dashboard', protect, getCodingDashboard);
 
 export default router;
+
