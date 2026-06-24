@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import CodingQuestion from '../models/CodingQuestion.js';
 import CodingSubmission from '../models/CodingSubmission.js';
 import { generateAIQuestion, evaluateSubmission } from '../services/codingJourneyService.js';
+import { calculateCodingStreaks, generateActivities } from '../utils/codingJourneyHelper.js';
 
 /**
  * Validates and parses the target CTC string.
@@ -228,7 +229,8 @@ export const submitCode = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Coding question not found.' });
     }
 
-    // Call AI Evaluation service
+    // Call AI Evaluation service with duration tracking
+    const startEvalTime = Date.now();
     const evaluation = await evaluateSubmission({
       title: questionDoc.title,
       description: questionDoc.description,
@@ -240,6 +242,7 @@ export const submitCode = async (req, res, next) => {
       language,
       customTestCases
     });
+    const evaluationDuration = Date.now() - startEvalTime;
 
     // Save to Database
     const newSubmission = new CodingSubmission({
@@ -259,7 +262,8 @@ export const submitCode = async (req, res, next) => {
       timeComplexity: evaluation.timeComplexity,
       spaceComplexity: evaluation.spaceComplexity,
       testCasesPassed: evaluation.testCasesPassed,
-      totalTestCases: evaluation.totalTestCases
+      totalTestCases: evaluation.totalTestCases,
+      evaluationDuration
     });
 
     try {
@@ -276,6 +280,10 @@ export const submitCode = async (req, res, next) => {
     try {
       if (evaluation.status === 'passed') {
         questionDoc.status = 'solved';
+        questionDoc.lastSolvedAt = Date.now();
+        if (!questionDoc.firstSolvedAt) {
+          questionDoc.firstSolvedAt = Date.now();
+        }
       } else if (questionDoc.status !== 'solved') {
         questionDoc.status = 'attempted';
       }
@@ -520,6 +528,598 @@ export const getCodingDashboard = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve coding analytics dashboard.'
+    });
+  }
+};
+
+/**
+ * Endpoint to search and filter coding questions history.
+ * 
+ * @route GET /api/coding-journey/history
+ * @access Private
+ */
+export const getHistory = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      difficulty,
+      topic,
+      language,
+      company,
+      search,
+      startDate,
+      endDate,
+      bookmarked
+    } = req.query;
+
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 10;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Base query for user
+    const query = { user: req.user._id };
+
+    // Filters
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    if (difficulty && difficulty !== 'all') {
+      query.difficulty = difficulty;
+    }
+    if (topic && topic !== 'all') {
+      query.topic = topic;
+    }
+    if (language && language !== 'all') {
+      query.language = language;
+    }
+    if (company && company !== 'all') {
+      query.company = new RegExp(company.trim(), 'i');
+    }
+    if (bookmarked === 'true') {
+      query.bookmarkedBy = req.user._id;
+    } else if (bookmarked === 'false') {
+      query.bookmarkedBy = { $ne: req.user._id };
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { title: searchRegex },
+        { description: searchRegex },
+        { company: searchRegex },
+        { role: searchRegex },
+        { topic: searchRegex }
+      ];
+    }
+
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    const totalResults = await CodingQuestion.countDocuments(query);
+    const questionsList = await CodingQuestion.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    const formattedQuestions = await Promise.all(
+      questionsList.map(async (q) => {
+        const submissions = await CodingSubmission.find({
+          user: req.user._id,
+          question: q._id
+        }).select('score submittedAt createdAt').lean();
+
+        const attemptCount = submissions.length;
+        let latestSubmissionDate = null;
+        let bestScore = 0;
+
+        if (attemptCount > 0) {
+          const sorted = [...submissions].sort((a, b) => new Date(b.submittedAt || b.createdAt) - new Date(a.submittedAt || a.createdAt));
+          latestSubmissionDate = sorted[0].submittedAt || sorted[0].createdAt;
+          bestScore = Math.max(...submissions.map(s => s.score || 0));
+        }
+        
+        return {
+          ...q,
+          attemptCount,
+          isBookmarked: q.bookmarkedBy ? q.bookmarkedBy.some(id => id.toString() === req.user._id.toString()) : false,
+          latestSubmissionDate,
+          bestScore
+        };
+      })
+    );
+
+    const totalPages = Math.ceil(totalResults / limitNum) || 1;
+
+    return res.status(200).json({
+      success: true,
+      questions: formattedQuestions,
+      totalPages,
+      currentPage: pageNum,
+      hasNextPage: pageNum < totalPages,
+      hasPreviousPage: pageNum > 1,
+      totalResults
+    });
+  } catch (error) {
+    console.error('[CODING JOURNEY CONTROLLER ERROR] getHistory error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve question history.'
+    });
+  }
+};
+
+/**
+ * Toggle bookmark for a coding question.
+ * 
+ * @route PATCH /api/coding-journey/bookmark/:questionId
+ * @access Private
+ */
+export const toggleBookmark = async (req, res, next) => {
+  try {
+    const { questionId } = req.params;
+    const userId = req.user._id;
+
+    if (!questionId || !mongoose.Types.ObjectId.isValid(questionId)) {
+      return res.status(400).json({ success: false, message: 'Invalid Question ID' });
+    }
+
+    const question = await CodingQuestion.findById(questionId);
+    if (!question) {
+      return res.status(404).json({ success: false, message: 'Question not found' });
+    }
+
+    const bookmarkedByStrs = (question.bookmarkedBy || []).map(id => id.toString());
+    const isBookmarked = bookmarkedByStrs.includes(userId.toString());
+
+    if (isBookmarked) {
+      await CodingQuestion.findByIdAndUpdate(
+        questionId,
+        { $pull: { bookmarkedBy: userId } }
+      );
+    } else {
+      await CodingQuestion.findByIdAndUpdate(
+        questionId,
+        { $addToSet: { bookmarkedBy: userId } }
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: isBookmarked ? 'Bookmark removed successfully.' : 'Bookmark added successfully.',
+      isBookmarked: !isBookmarked
+    });
+  } catch (error) {
+    console.error('[CODING JOURNEY CONTROLLER ERROR] toggleBookmark error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to toggle bookmark.'
+    });
+  }
+};
+
+/**
+ * Fetch all bookmarked questions.
+ * 
+ * @route GET /api/coding-journey/bookmarks
+ * @access Private
+ */
+export const getBookmarks = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const questions = await CodingQuestion.find({ bookmarkedBy: userId }).lean();
+
+    const formattedQuestions = await Promise.all(
+      questions.map(async (q) => {
+        const submissions = await CodingSubmission.find({
+          user: userId,
+          question: q._id
+        }).select('score submittedAt createdAt').lean();
+
+        const attemptCount = submissions.length;
+        let latestSubmissionDate = null;
+        let bestScore = 0;
+
+        if (attemptCount > 0) {
+          const sorted = [...submissions].sort((a, b) => new Date(b.submittedAt || b.createdAt) - new Date(a.submittedAt || a.createdAt));
+          latestSubmissionDate = sorted[0].submittedAt || sorted[0].createdAt;
+          bestScore = Math.max(...submissions.map(s => s.score || 0));
+        }
+
+        return {
+          ...q,
+          attemptCount,
+          isBookmarked: true,
+          latestSubmissionDate,
+          bestScore
+        };
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      questions: formattedQuestions
+    });
+  } catch (error) {
+    console.error('[CODING JOURNEY CONTROLLER ERROR] getBookmarks error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve bookmarked questions.'
+    });
+  }
+};
+
+/**
+ * Endpoint to get comprehensive coding analytics.
+ * 
+ * @route GET /api/coding-journey/analytics
+ * @access Private
+ */
+export const getAnalytics = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+
+    // Fetch all generated questions
+    const questions = await CodingQuestion.find({ user: userId }).lean();
+
+    // Fetch all submissions populated with question details
+    const submissions = await CodingSubmission.find({ user: userId })
+      .populate('question')
+      .sort({ submittedAt: -1 })
+      .lean();
+
+    // Bookmarks count
+    const bookmarkedQuestions = await CodingQuestion.find({ bookmarkedBy: userId }).lean();
+    const questionsBookmarked = bookmarkedQuestions.length;
+
+    // Generated today
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const questionsGeneratedToday = questions.filter(q => new Date(q.createdAt) >= startOfToday).length;
+
+    // Totals
+    const totalQuestionsGenerated = questions.length;
+    const totalSubmissions = submissions.length;
+
+    const attemptedQuestionIds = new Set(
+      submissions.map(s => s.question?._id?.toString() || s.question?.toString()).filter(Boolean)
+    );
+    const totalQuestionsAttempted = attemptedQuestionIds.size;
+
+    const solvedQuestionIds = new Set(
+      submissions
+        .filter(s => s.status === 'passed')
+        .map(s => s.question?._id?.toString() || s.question?.toString())
+        .filter(Boolean)
+    );
+    const totalQuestionsSolved = solvedQuestionIds.size;
+
+    // Performance metrics
+    const totalPassedSubmissions = submissions.filter(s => s.status === 'passed').length;
+    const acceptanceRate = totalSubmissions > 0 ? Math.round((totalPassedSubmissions / totalSubmissions) * 100) : 0;
+    const averageScore = totalSubmissions > 0 ? Math.round(submissions.reduce((acc, s) => acc + (s.score || 0), 0) / totalSubmissions) : 0;
+    const highestScore = totalSubmissions > 0 ? Math.max(...submissions.map(s => s.score || 0)) : 0;
+
+    // Streaks
+    const streaks = calculateCodingStreaks(submissions);
+    const currentStreak = streaks.currentStreak;
+    const longestStreak = streaks.longestStreak;
+
+    // Favorites
+    const topicCounts = {};
+    const companyCounts = {};
+    const languageCounts = {};
+
+    submissions.forEach(s => {
+      if (s.question?.topic) {
+        topicCounts[s.question.topic] = (topicCounts[s.question.topic] || 0) + 1;
+      }
+      if (s.question?.company) {
+        companyCounts[s.question.company] = (companyCounts[s.question.company] || 0) + 1;
+      }
+      if (s.language) {
+        languageCounts[s.language] = (languageCounts[s.language] || 0) + 1;
+      }
+    });
+
+    let favoriteTopic = 'N/A';
+    let maxTopic = 0;
+    Object.keys(topicCounts).forEach(t => {
+      if (topicCounts[t] > maxTopic) {
+        maxTopic = topicCounts[t];
+        favoriteTopic = t;
+      }
+    });
+
+    let favoriteCompany = 'N/A';
+    let maxCompany = 0;
+    Object.keys(companyCounts).forEach(c => {
+      if (companyCounts[c] > maxCompany) {
+        maxCompany = companyCounts[c];
+        favoriteCompany = c;
+      }
+    });
+
+    let favoriteLanguage = 'N/A';
+    let maxLanguage = 0;
+    Object.keys(languageCounts).forEach(l => {
+      if (languageCounts[l] > maxLanguage) {
+        maxLanguage = languageCounts[l];
+        favoriteLanguage = l;
+      }
+    });
+
+    // Active days & Average Submissions
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayOfWeekCounts = {
+      Sunday: 0, Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0, Saturday: 0
+    };
+
+    submissions.forEach(s => {
+      const d = new Date(s.submittedAt || s.createdAt);
+      const dayName = dayNames[d.getDay()];
+      dayOfWeekCounts[dayName]++;
+    });
+
+    let mostActiveDay = 'N/A';
+    let maxDaySubmissions = 0;
+    dayNames.forEach(day => {
+      if (dayOfWeekCounts[day] > maxDaySubmissions) {
+        maxDaySubmissions = dayOfWeekCounts[day];
+        mostActiveDay = day;
+      }
+    });
+
+    let leastActiveDay = 'N/A';
+    let minDaySubmissions = Infinity;
+    dayNames.forEach(day => {
+      if (dayOfWeekCounts[day] > 0 && dayOfWeekCounts[day] < minDaySubmissions) {
+        minDaySubmissions = dayOfWeekCounts[day];
+        leastActiveDay = day;
+      }
+    });
+    if (leastActiveDay === 'N/A' && maxDaySubmissions > 0) {
+      leastActiveDay = mostActiveDay;
+    }
+
+    const uniqueActiveDays = new Set(
+      submissions.map(s => {
+        const date = new Date(s.submittedAt || s.createdAt);
+        const offset = date.getTimezoneOffset();
+        const localTime = new Date(date.getTime() - offset * 60 * 1000);
+        return localTime.toISOString().split('T')[0];
+      })
+    ).size;
+    const averageSubmissionsPerDay = uniqueActiveDays > 0 ? Number((totalSubmissions / uniqueActiveDays).toFixed(2)) : 0;
+
+    // Charts Distributions
+    const categoryDistribution = Object.keys(topicCounts).map(name => ({
+      name,
+      count: topicCounts[name]
+    })).sort((a, b) => b.count - a.count);
+
+    const diffCounts = { Easy: 0, Medium: 0, Hard: 0 };
+    submissions.forEach(s => {
+      if (s.question?.difficulty) {
+        diffCounts[s.question.difficulty]++;
+      }
+    });
+    const difficultyDistribution = Object.keys(diffCounts).map(name => ({
+      name,
+      count: diffCounts[name]
+    }));
+
+    const languageDistribution = Object.keys(languageCounts).map(name => ({
+      name,
+      count: languageCounts[name]
+    }));
+
+    // Weekly and Monthly practice
+    const weeklyPractice = [];
+    const weekdayShortNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dayName = weekdayShortNames[d.getDay()];
+      const count = submissions.filter(s => {
+        const sDate = new Date(s.submittedAt || s.createdAt);
+        sDate.setHours(0, 0, 0, 0);
+        return sDate.getTime() === d.getTime();
+      }).length;
+      weeklyPractice.push({ name: dayName, date: dateStr, count });
+    }
+
+    const monthlyPractice = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const count = submissions.filter(s => {
+        const sDate = new Date(s.submittedAt || s.createdAt);
+        sDate.setHours(0, 0, 0, 0);
+        return sDate.getTime() === d.getTime();
+      }).length;
+      monthlyPractice.push({ name: dateStr, count });
+    }
+
+    // Cumulative highest score per day for 30 days
+    const scoreImprovementTrend = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      const subsUpToDay = submissions.filter(s => {
+        const sDate = new Date(s.submittedAt || s.createdAt);
+        return sDate.getTime() <= d.getTime() + 86399999;
+      });
+      
+      const maxScore = subsUpToDay.length > 0 
+        ? Math.max(...subsUpToDay.map(s => s.score || 0)) 
+        : 0;
+
+      scoreImprovementTrend.push({ name: dateStr, score: maxScore });
+    }
+
+    // Recent Activities list
+    const activitiesRaw = generateActivities(questions, submissions, userId);
+    const recentActivities = activitiesRaw.slice(0, 15).map(act => ({
+      text: act.text,
+      time: getRelativeTimeText(new Date(act.timestamp)),
+      type: act.type,
+      icon: act.icon,
+      color: act.color
+    }));
+
+    return res.status(200).json({
+      success: true,
+      totalQuestionsGenerated,
+      totalQuestionsAttempted,
+      totalQuestionsSolved,
+      totalSubmissions,
+      questionsBookmarked,
+      questionsGeneratedToday,
+      acceptanceRate,
+      averageScore,
+      highestScore,
+      currentStreak,
+      longestStreak,
+      favoriteTopic,
+      favoriteCompany,
+      favoriteLanguage,
+      mostActiveDay,
+      leastActiveDay,
+      averageSubmissionsPerDay,
+      weeklyPractice,
+      monthlyPractice,
+      categoryDistribution,
+      difficultyDistribution,
+      languageDistribution,
+      scoreImprovementTrend,
+      recentActivities
+    });
+  } catch (error) {
+    console.error('[CODING JOURNEY CONTROLLER ERROR] getAnalytics error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve analytics dashboard.'
+    });
+  }
+};
+
+/**
+ * Endpoint to retrieve details, score trends, and submission timeline for a single question.
+ * 
+ * @route GET /api/coding-journey/question/:questionId
+ * @access Private
+ */
+export const getQuestionDetails = async (req, res, next) => {
+  try {
+    const { questionId } = req.params;
+    const userId = req.user._id;
+
+    if (!questionId || !mongoose.Types.ObjectId.isValid(questionId)) {
+      return res.status(400).json({ success: false, message: 'Invalid Question ID' });
+    }
+
+    const question = await CodingQuestion.findById(questionId).lean();
+    if (!question) {
+      return res.status(404).json({ success: false, message: 'Question not found' });
+    }
+
+    const submissions = await CodingSubmission.find({
+      user: userId,
+      question: questionId
+    }).sort({ submittedAt: -1 }).lean();
+
+    const latestSubmission = submissions[0] || null;
+
+    let bestSubmission = null;
+    if (submissions.length > 0) {
+      bestSubmission = submissions.reduce((best, current) => {
+        if (!best) return current;
+        return (current.score || 0) >= (best.score || 0) ? current : best;
+      }, null);
+    }
+
+    // chronological array of { attempt, score, date }
+    const scoreTrend = [...submissions].reverse().map((s, idx) => ({
+      attempt: idx + 1,
+      score: s.score || 0,
+      date: new Date(s.submittedAt || s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }));
+
+    // chronological array of { feedback, score, status, date }
+    const feedbackTimeline = [...submissions].reverse().map(s => ({
+      feedback: s.feedback || '',
+      score: s.score || 0,
+      status: s.status,
+      date: new Date(s.submittedAt || s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }));
+
+    // Computed statistics
+    let attemptCount = submissions.length;
+    let acceptanceRate = 0;
+    let avgScore = 0;
+    let highestScore = 0;
+    let latestScore = 0;
+    let improvementPercentage = 0;
+
+    if (attemptCount > 0) {
+      const passedCount = submissions.filter(s => s.status === 'passed').length;
+      acceptanceRate = Math.round((passedCount / attemptCount) * 100);
+      avgScore = Math.round(submissions.reduce((acc, s) => acc + (s.score || 0), 0) / attemptCount);
+      highestScore = Math.max(...submissions.map(s => s.score || 0));
+      latestScore = latestSubmission.score || 0;
+      
+      const firstScore = submissions[submissions.length - 1].score || 0;
+      improvementPercentage = latestScore - firstScore;
+    }
+
+    const statistics = {
+      attemptCount,
+      acceptanceRate,
+      avgScore,
+      highestScore,
+      latestScore,
+      improvementPercentage
+    };
+
+    const isBookmarked = question.bookmarkedBy ? question.bookmarkedBy.some(id => id.toString() === userId.toString()) : false;
+
+    return res.status(200).json({
+      success: true,
+      question: {
+        ...question,
+        isBookmarked
+      },
+      latestSubmission,
+      bestSubmission,
+      submissions,
+      scoreTrend,
+      feedbackTimeline,
+      statistics
+    });
+  } catch (error) {
+    console.error('[CODING JOURNEY CONTROLLER ERROR] getQuestionDetails error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve question details.'
     });
   }
 };

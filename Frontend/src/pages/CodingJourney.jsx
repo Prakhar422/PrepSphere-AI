@@ -2,105 +2,43 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Brain,
-  FileSearch,
-  MessageSquareCode,
   Code2,
-  BookOpen,
   LineChart,
-  Sparkles,
-  Flame,
-  Award,
-  ChevronRight,
   Play,
-  Calendar,
-  Clock,
   CheckCircle2,
   ArrowLeft,
-  ArrowRight,
-  HelpCircle,
-  BookOpenCheck,
-  Zap,
-  Activity,
-  Trophy,
-  Target,
-  Bookmark,
-  Star,
-  Plus,
-  Minus,
-  RefreshCw,
-  ExternalLink,
   ChevronDown,
-  ChevronUp,
   Info,
   X,
   Loader2,
+  Sparkles
 } from "lucide-react";
 import {
   generateQuestion as generateQuestionService,
   submitCode as submitCodeService,
   getSubmissions as getSubmissionsService,
-  getCodingDashboard as getCodingDashboardService
+  getHistory,
+  toggleBookmark,
+  getAnalytics,
+  getQuestionDetails
 } from "../services/codingJourneyService";
 import CodeEditor from "../components/coding/CodeEditor";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  LineChart as ReChartsLineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
+// ReCharts removed from parent page as they are moved to child subcomponents
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
+import HistoryTab from "../components/coding/HistoryTab";
+import AnalyticsTab from "../components/coding/AnalyticsTab";
+import DetailedReportDrawer from "../components/coding/DetailedReportDrawer";
 
-// Count-up animation component for numbers
-const AnimatedNumber = ({ value, duration = 1200 }) => {
-  const [current, setCurrent] = useState(0);
 
-  useEffect(() => {
-    let start = 0;
-    const end = parseInt(value, 10) || 0;
-    if (end === 0) {
-      setCurrent(0);
-      return;
-    }
-    const totalSteps = 60;
-    const increment = end / totalSteps;
-    const stepTime = duration / totalSteps;
-    let step = 0;
-
-    const timer = setInterval(() => {
-      step++;
-      start += increment;
-      if (step >= totalSteps) {
-        clearInterval(timer);
-        setCurrent(end);
-      } else {
-        setCurrent(Math.floor(start));
-      }
-    }, stepTime);
-
-    return () => clearInterval(timer);
-  }, [value, duration]);
-
-  return <>{current.toLocaleString()}</>;
-};
 
 
 const CodingJourney = () => {
   // Responsive state
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // View switch mode ("dashboard" | "generator")
-  const [viewMode, setViewMode] = useState("dashboard");
+  // Active tab state
+  const [activeTab, setActiveTab] = useState("practice"); // "practice" | "history" | "analytics"
 
   // Question Generator states
   const [companyInput, setCompanyInput] = useState("");
@@ -145,41 +83,161 @@ const CodingJourney = () => {
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [expandedSubmissionId, setExpandedSubmissionId] = useState(null);
 
-  // Dynamic Dashboard states
-  const [dashboardStats, setDashboardStats] = useState({ attemptedCount: 0, solvedCount: 0, likelyAcceptanceRate: 0, streak: 0 });
-  const [dashboardCategories, setDashboardCategories] = useState([]);
-  const [dashboardWeeklyPractice, setDashboardWeeklyPractice] = useState([]);
-  const [dashboardDifficulty, setDashboardDifficulty] = useState([]);
-  const [dashboardRecentActivity, setDashboardRecentActivity] = useState([]);
-  const [dashboardQuestions, setDashboardQuestions] = useState([]);
-  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  // History Tab States
+  const [historyQuestions, setHistoryQuestions] = useState([]);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyTotalResults, setHistoryTotalResults] = useState(0);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyCompany, setHistoryCompany] = useState("all");
+  const [historyTopic, setHistoryTopic] = useState("all");
+  const [historyDifficulty, setHistoryDifficulty] = useState("all");
+  const [historyStatus, setHistoryStatus] = useState("all");
+  const [historyLanguage, setHistoryLanguage] = useState("all");
+  const [historyStartDate, setHistoryStartDate] = useState("");
+  const [historyEndDate, setHistoryEndDate] = useState("");
+  const [historyBookmarkedOnly, setHistoryBookmarkedOnly] = useState(false);
 
-  // Fetch Dashboard Stats and Data from database
-  const fetchDashboardData = async () => {
-    setLoadingDashboard(true);
+  // Drawer States
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [drawerQuestionId, setDrawerQuestionId] = useState(null);
+  const [drawerDetails, setDrawerDetails] = useState(null);
+  const [loadingDrawerDetails, setLoadingDrawerDetails] = useState(false);
+  const [drawerActiveTab, setDrawerActiveTab] = useState("question"); // "question", "latest", "history", "score", "feedback", "best"
+
+  // Analytics Tab States
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+  // Fetch history data
+  const fetchHistoryData = async (pageToFetch = historyPage) => {
+    setLoadingHistory(true);
     try {
-      const response = await getCodingDashboardService();
-      if (response.success && response.data) {
-        setDashboardStats(response.data.stats);
-        setDashboardCategories(response.data.problemCategoriesChartData);
-        setDashboardWeeklyPractice(response.data.weeklyPracticeData);
-        setDashboardDifficulty(response.data.problemDifficultyChartData);
-        setDashboardRecentActivity(response.data.recentActivity);
-        setDashboardQuestions(response.data.questions);
+      const params = {
+        page: pageToFetch,
+        limit: 6,
+        search: historySearch,
+        company: historyCompany === "all" ? "" : historyCompany,
+        topic: historyTopic === "all" ? "" : historyTopic,
+        difficulty: historyDifficulty === "all" ? "" : historyDifficulty,
+        status: historyStatus === "all" ? "" : historyStatus,
+        language: historyLanguage === "all" ? "" : historyLanguage,
+        startDate: historyStartDate,
+        endDate: historyEndDate,
+        bookmarked: historyBookmarkedOnly ? "true" : "all"
+      };
+      const response = await getHistory(params);
+      if (response.success) {
+        setHistoryQuestions(response.questions || []);
+        setHistoryTotalPages(response.totalPages || 1);
+        setHistoryTotalResults(response.totalResults || 0);
       }
     } catch (err) {
-      console.error("Failed to fetch coding dashboard data:", err);
+      console.error("Failed to fetch question history:", err);
     } finally {
-      setLoadingDashboard(false);
+      setLoadingHistory(false);
     }
   };
 
-  // Load dashboard data when viewMode changes to dashboard (handles both initial mount and view switches)
-  useEffect(() => {
-    if (viewMode === "dashboard") {
-      fetchDashboardData();
+  // Fetch analytics data
+  const fetchAnalyticsData = async () => {
+    setLoadingAnalytics(true);
+    try {
+      const response = await getAnalytics();
+      if (response.success) {
+        setAnalyticsData(response);
+      }
+    } catch (err) {
+      console.error("Failed to fetch analytics:", err);
+    } finally {
+      setLoadingAnalytics(false);
     }
-  }, [viewMode]);
+  };
+
+  // Toggle bookmark on history question card
+  const handleToggleBookmark = async (qId) => {
+    try {
+      const response = await toggleBookmark(qId);
+      if (response.success) {
+        showToast(response.message, "success");
+        // Update local state if the drawer is active on the same question
+        if (drawerQuestionId === qId && drawerDetails) {
+          setDrawerDetails(prev => ({
+            ...prev,
+            question: {
+              ...prev.question,
+              isBookmarked: response.isBookmarked
+            }
+          }));
+        }
+        // Refresh question list
+        fetchHistoryData(historyPage);
+        // If active question in practice workspace is the bookmarked one, update its bookmark status
+        if (generatedQuestion && generatedQuestion._id === qId) {
+          setGeneratedQuestion(prev => ({
+            ...prev,
+            isBookmarked: response.isBookmarked
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle bookmark:", err);
+      showToast("Error updating bookmark.", "error");
+    }
+  };
+
+  // Open detailed report drawer
+  const handleOpenDrawer = async (qId) => {
+    setDrawerQuestionId(qId);
+    setIsDrawerOpen(true);
+    setDrawerActiveTab("question");
+    setLoadingDrawerDetails(true);
+    try {
+      const response = await getQuestionDetails(qId);
+      if (response.success) {
+        setDrawerDetails(response);
+      }
+    } catch (err) {
+      console.error("Failed to load question details:", err);
+      showToast("Failed to load question details.", "error");
+    } finally {
+      setLoadingDrawerDetails(false);
+    }
+  };
+
+  // Fetch history data when tab or page changes
+  useEffect(() => {
+    if (activeTab === "history") {
+      fetchHistoryData(historyPage);
+    }
+  }, [activeTab, historyPage]);
+
+  // Reset pagination page to 1 when any filter changes
+  useEffect(() => {
+    if (activeTab !== "history") return;
+    if (historyPage !== 1) {
+      setHistoryPage(1);
+    } else {
+      fetchHistoryData(1);
+    }
+  }, [
+    historySearch,
+    historyCompany,
+    historyTopic,
+    historyDifficulty,
+    historyStatus,
+    historyLanguage,
+    historyStartDate,
+    historyEndDate,
+    historyBookmarkedOnly
+  ]);
+
+  useEffect(() => {
+    if (activeTab === "analytics") {
+      fetchAnalyticsData();
+    }
+  }, [activeTab]);
 
   // Fetch previous attempts for the active question
   const fetchSubmissionsHistory = async (questionId) => {
@@ -230,7 +288,7 @@ const CodingJourney = () => {
     setCtcInput(q.ctc || "");
     setEvaluationResult(null);
     setExpandedSubmissionId(null);
-    setViewMode("generator");
+    setActiveTab("practice");
   };
 
   const handleSubmitCode = async () => {
@@ -255,9 +313,8 @@ const CodingJourney = () => {
       if (response.success && response.data) {
         setEvaluationResult(response.data);
         showToast("Submission evaluated successfully!", "success");
-        // Refresh submissions history and dashboard statistics
+        // Refresh submissions history
         fetchSubmissionsHistory(generatedQuestion._id);
-        fetchDashboardData();
       } else {
         showToast(response.message || "Failed to evaluate submission.", "error");
       }
@@ -499,515 +556,86 @@ const CodingJourney = () => {
 
             {/* Navigation Tabs */}
             <div className="flex border-b border-white/10 gap-6 mb-6 text-left">
-              <button
-                onClick={() => setViewMode("dashboard")}
-                className={`pb-3 text-sm font-bold transition-all relative cursor-pointer focus:outline-none ${
-                  viewMode === "dashboard" ? "text-indigo-400 font-extrabold" : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                Practice Dashboard
-                {viewMode === "dashboard" && (
-                  <motion.div
-                    layoutId="activeTabBorder"
-                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-500"
-                  />
-                )}
-              </button>
-              <button
-                onClick={() => setViewMode("generator")}
-                className={`pb-3 text-sm font-bold transition-all relative cursor-pointer focus:outline-none ${
-                  viewMode === "generator" ? "text-indigo-400 font-extrabold" : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                AI Question Generator
-                {viewMode === "generator" && (
-                  <motion.div
-                    layoutId="activeTabBorder"
-                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-500"
-                  />
-                )}
-              </button>
+              {["practice", "history", "analytics"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`pb-3 text-sm font-bold transition-all relative cursor-pointer focus:outline-none capitalize ${
+                    activeTab === tab ? "text-indigo-400 font-extrabold" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  {tab}
+                  {activeTab === tab && (
+                    <motion.div
+                      layoutId="activeTabBorder"
+                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-500"
+                    />
+                  )}
+                </button>
+              ))}
             </div>
 
-            {viewMode === "dashboard" ? (
-              loadingDashboard ? (
-                /* LOADING DASHBOARD STATE */
-                <div className="h-[400px] flex flex-col items-center justify-center space-y-4">
-                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-                  <p className="text-sm text-slate-400 font-mono">Loading Practice Analytics Dashboard...</p>
-                </div>
-              ) : dashboardQuestions.length === 0 ? (
-                /* EMPTY STATE VIEW */
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex flex-col items-center justify-center p-16 bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-xl text-center max-w-lg mx-auto space-y-5 shadow-lg"
-                >
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                    <Code2 className="w-8 h-8" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">
-                      Start Your Coding Journey
-                    </h3>
-                    <p className="text-sm text-slate-400 leading-relaxed font-light max-w-xs mx-auto">
-                      Generate your first AI-generated coding question to unlock analytics, topic masteries, and consistency trackers.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setViewMode("generator");
-                    }}
-                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white text-sm font-bold transition-all cursor-pointer shadow-lg shadow-indigo-500/25 hover:scale-[1.01]"
-                  >
-                    Start Practicing
-                  </button>
-                </motion.div>
-              ) : (
-                /* POPULATED DASHBOARD VIEW */
-                <div className="space-y-8">
-                  {/* STATISTICS CARDS */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {/* Card 1: Problems Solved */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all">
-                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                      <div className="flex justify-between items-start">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                          Problems Solved
-                        </span>
-                        <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
-                          <CheckCircle2 className="w-4 h-4" />
-                        </div>
-                      </div>
-                      <div className="mt-4">
-                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-                          <AnimatedNumber value={dashboardStats.solvedCount} />
-                        </span>
-                      </div>
-                      <div className="mt-2 text-xs text-indigo-400 font-semibold">
-                        <span>Likely Accepted Solutions</span>
-                      </div>
-                    </div>
+            {activeTab === "history" && (
+              <HistoryTab
+                questions={historyQuestions}
+                totalPages={historyTotalPages}
+                currentPage={historyPage}
+                totalResults={historyTotalResults}
+                loading={loadingHistory}
+                onPageChange={setHistoryPage}
+                onViewDetails={handleOpenDrawer}
+                onToggleBookmark={handleToggleBookmark}
+                search={historySearch}
+                setSearch={setHistorySearch}
+                company={historyCompany}
+                setCompany={setHistoryCompany}
+                topic={historyTopic}
+                setTopic={setHistoryTopic}
+                difficulty={historyDifficulty}
+                setDifficulty={setHistoryDifficulty}
+                status={historyStatus}
+                setStatus={setHistoryStatus}
+                language={historyLanguage}
+                setLanguage={setHistoryLanguage}
+                startDate={historyStartDate}
+                setStartDate={setHistoryStartDate}
+                endDate={historyEndDate}
+                setEndDate={setHistoryEndDate}
+                bookmarkedOnly={historyBookmarkedOnly}
+                setBookmarkedOnly={setHistoryBookmarkedOnly}
+                onClearFilters={() => {
+                  setHistorySearch("");
+                  setHistoryCompany("all");
+                  setHistoryTopic("all");
+                  setHistoryDifficulty("all");
+                  setHistoryStatus("all");
+                  setHistoryLanguage("all");
+                  setHistoryStartDate("");
+                  setHistoryEndDate("");
+                  setHistoryBookmarkedOnly(false);
+                  setHistoryPage(1);
+                }}
+              />
+            )}
 
-                    {/* Card 2: Streak */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 transition-all">
-                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
-                      <div className="flex justify-between items-start">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                          Current Streak
-                        </span>
-                        <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
-                          <Flame className="w-4 h-4 animate-pulse" />
-                        </div>
-                      </div>
-                      <div className="mt-4">
-                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-                          <AnimatedNumber value={dashboardStats.streak} /> Days
-                        </span>
-                      </div>
-                      <div className="mt-2 text-xs text-purple-400 font-semibold">
-                        <span>Keep the momentum going</span>
-                      </div>
-                    </div>
+            {activeTab === "analytics" && (
+              <AnalyticsTab
+                data={analyticsData}
+                loading={loadingAnalytics}
+              />
+            )}
 
-                    {/* Card 3: Acceptance Rate */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all">
-                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                      <div className="flex justify-between items-start">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                          Acceptance Rate
-                        </span>
-                        <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-                          <Target className="w-4 h-4" />
-                        </div>
-                      </div>
-                      <div className="mt-4">
-                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
-                          <AnimatedNumber value={dashboardStats.likelyAcceptanceRate} />%
-                        </span>
-                      </div>
-                      <div className="mt-2 text-xs text-cyan-400 font-semibold">
-                        <span>Likely Acceptance Ratio</span>
-                      </div>
-                    </div>
+            <DetailedReportDrawer
+              isOpen={isDrawerOpen}
+              onClose={() => setIsDrawerOpen(false)}
+              details={drawerDetails}
+              loading={loadingDrawerDetails}
+              onToggleBookmark={handleToggleBookmark}
+              activeTab={drawerActiveTab}
+              setActiveTab={setDrawerActiveTab}
+            />
 
-                    {/* Card 4: Attempted Questions */}
-                    <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all">
-                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-                      <div className="flex justify-between items-start">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                          Attempted Questions
-                        </span>
-                        <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
-                          <Brain className="w-4 h-4" />
-                        </div>
-                      </div>
-                      <div className="mt-4">
-                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                          <AnimatedNumber value={dashboardStats.attemptedCount} />
-                        </span>
-                      </div>
-                      <div className="mt-2 text-xs text-pink-400 font-semibold">
-                        <span>Out of generated questions</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Charts Grid */}
-                  <div
-                    id="progress-charts"
-                    className="grid grid-cols-1 lg:grid-cols-12 gap-8 scroll-mt-24"
-                  >
-                    {/* Left Column (7 cols): Categories and Weekly Practice */}
-                    <div className="lg:col-span-7 space-y-8">
-                      {/* Solving Categories (Horizontal Bar chart) */}
-                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-                        <h3 className="text-base font-semibold text-white mb-4">
-                          Problems Solved by Categories
-                        </h3>
-
-                        <div className="h-[260px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              layout="vertical"
-                              data={dashboardCategories}
-                              margin={{
-                                top: 10,
-                                right: 10,
-                                left: 40,
-                                bottom: 0,
-                              }}
-                            >
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                stroke="rgba(255,255,255,0.05)"
-                                horizontal={true}
-                                vertical={false}
-                              />
-                              <XAxis
-                                type="number"
-                                stroke="#64748b"
-                                fontSize={10}
-                                tickLine={false}
-                                allowDecimals={false}
-                              />
-                              <YAxis
-                                type="category"
-                                dataKey="name"
-                                stroke="#64748b"
-                                fontSize={10}
-                                tickLine={false}
-                                width={100}
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  background: "#080e24",
-                                  border: "1px solid rgba(255,255,255,0.1)",
-                                  borderRadius: "12px",
-                                }}
-                                itemStyle={{ color: "#fff" }}
-                                labelClassName="text-slate-400 font-bold"
-                              />
-                              <Bar
-                                dataKey="count"
-                                radius={[0, 8, 8, 0]}
-                                barSize={12}
-                              >
-                                {dashboardCategories.map(
-                                  (entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={entry.fill}
-                                    />
-                                  ),
-                                )}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      {/* Weekly practice (Line chart) */}
-                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
-                        <h3 className="text-base font-semibold text-white mb-4">
-                          Weekly Practice Consistency (Submissions)
-                        </h3>
-
-                        <div className="h-[200px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <ReChartsLineChart
-                              data={dashboardWeeklyPractice}
-                              margin={{
-                                top: 10,
-                                right: 10,
-                                left: -25,
-                                bottom: 0,
-                              }}
-                            >
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                stroke="rgba(255,255,255,0.05)"
-                                vertical={false}
-                              />
-                              <XAxis
-                                dataKey="name"
-                                stroke="#64748b"
-                                fontSize={11}
-                                tickLine={false}
-                              />
-                              <YAxis
-                                stroke="#64748b"
-                                fontSize={11}
-                                tickLine={false}
-                                allowDecimals={false}
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  background: "#080e24",
-                                  border: "1px solid rgba(255,255,255,0.1)",
-                                  borderRadius: "12px",
-                                }}
-                                itemStyle={{ color: "#fff" }}
-                                labelClassName="text-slate-400 font-bold"
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="Problems"
-                                stroke="#818cf8"
-                                strokeWidth={3}
-                                dot={{
-                                  r: 4,
-                                  stroke: "#818cf8",
-                                  strokeWidth: 2,
-                                  fill: "#080e24",
-                                }}
-                                activeDot={{ r: 6, fill: "#818cf8" }}
-                              />
-                            </ReChartsLineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right Column (5 cols): Difficulty Distribution & Achievements */}
-                    <div className="lg:col-span-5 space-y-8">
-                      {/* Problem solved by difficulty (Pie Chart) */}
-                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                        <h3 className="text-base font-semibold text-white mb-4">
-                          Problem Solved by Difficulty
-                        </h3>
-
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                          <div className="h-[150px] w-[150px] shrink-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Tooltip
-                                  contentStyle={{
-                                    background: "#080e24",
-                                    border: "1px solid rgba(255,255,255,0.1)",
-                                    borderRadius: "12px",
-                                  }}
-                                  itemStyle={{ color: "#fff" }}
-                                />
-                                <Pie
-                                  data={dashboardDifficulty}
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={40}
-                                  outerRadius={60}
-                                  paddingAngle={5}
-                                  dataKey="value"
-                                >
-                                  {dashboardDifficulty.map(
-                                    (entry, index) => (
-                                      <Cell
-                                        key={`cell-${index}`}
-                                        fill={entry.color}
-                                      />
-                                    ),
-                                  )}
-                                </Pie>
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
-
-                          <div className="flex-1 space-y-2 text-xs text-slate-300 w-full">
-                            {dashboardDifficulty.map((item, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center justify-between"
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <div
-                                    className="w-2.5 h-2.5 rounded-full"
-                                    style={{ backgroundColor: item.color }}
-                                  />
-                                  <span className="font-medium text-slate-300">
-                                    {item.name}
-                                  </span>
-                                </div>
-                                <span className="font-mono font-bold text-white">
-                                  {item.value} solved
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Achievements card */}
-                      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-                        <h3 className="text-base font-semibold text-white mb-4">
-                          Practice Milestones
-                        </h3>
-                        <div className="space-y-4">
-                          <div className="flex justify-between items-center bg-slate-950/40 border border-white/5 p-3 rounded-2xl">
-                            <div className="flex items-center space-x-2.5">
-                              <Trophy className="w-4 h-4 text-yellow-400" />
-                              <span className="text-xs font-bold text-slate-200">First Steps</span>
-                            </div>
-                            <span className="text-[10px] bg-indigo-500/20 text-indigo-400 font-bold px-2 py-0.5 rounded-md">
-                              {dashboardStats.attemptedCount > 0 ? "UNLOCKED" : "LOCKED"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center bg-slate-950/40 border border-white/5 p-3 rounded-2xl">
-                            <div className="flex items-center space-x-2.5">
-                              <Zap className="w-4 h-4 text-cyan-400" />
-                              <span className="text-xs font-bold text-slate-200">Accepted solution</span>
-                            </div>
-                            <span className="text-[10px] bg-indigo-500/20 text-indigo-400 font-bold px-2 py-0.5 rounded-md">
-                              {dashboardStats.solvedCount > 0 ? "UNLOCKED" : "LOCKED"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center bg-slate-950/40 border border-white/5 p-3 rounded-2xl">
-                            <div className="flex items-center space-x-2.5">
-                              <Flame className="w-4 h-4 text-orange-400 animate-pulse" />
-                              <span className="text-xs font-bold text-slate-200">Streak Master (5d)</span>
-                            </div>
-                            <span className="text-[10px] bg-indigo-500/20 text-indigo-400 font-bold px-2 py-0.5 rounded-md">
-                              {dashboardStats.streak >= 5 ? "UNLOCKED" : "LOCKED"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* RECENT ACTIVITY & PRACTICE PROBLEMS LIST */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* Recent Activity Log (5 columns) */}
-                    <div className="lg:col-span-4 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
-                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-
-                      <div className="w-full">
-                        <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
-                          <Clock className="w-5 h-5 text-pink-400" />
-                          Recent Coding Activity
-                        </h3>
-
-                        <div className="relative border-l border-white/5 ml-3 pl-5 space-y-6">
-                          {dashboardRecentActivity.length === 0 ? (
-                            <p className="text-xs text-slate-500 italic py-4">No submissions yet. Start solving problems!</p>
-                          ) : (
-                            dashboardRecentActivity.slice(0, 4).map((act, index) => (
-                              <div
-                                key={index}
-                                className="relative text-left text-xs sm:text-sm"
-                              >
-                                {/* Bullet indicator */}
-                                <div className={`absolute -left-[26px] top-1 w-2.5 h-2.5 rounded-full border border-[#050B1F] ${
-                                  act.verdict === "Likely Accepted" ? "bg-emerald-500" :
-                                  act.verdict === "Partially Correct" ? "bg-amber-500" : "bg-red-500"
-                                }`} />
-
-                                <div className="space-y-1">
-                                  <p className="font-bold text-white leading-relaxed">
-                                    {act.text}
-                                  </p>
-                                  <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-slate-400 font-mono">
-                                    <span>{act.time}</span>
-                                    <span>&bull;</span>
-                                    <span>{act.language}</span>
-                                    <span>&bull;</span>
-                                    <span className={
-                                      act.verdict === "Likely Accepted" ? "text-emerald-400" :
-                                      act.verdict === "Partially Correct" ? "text-amber-400" : "text-red-400"
-                                    }>{act.verdict} ({act.score}/100)</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Generated Questions List (8 columns) */}
-                    <div className="lg:col-span-8 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-                      <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/35 to-transparent pointer-events-none" />
-                      <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
-                        <Code2 className="w-5 h-5 text-indigo-400" />
-                        Generated Practice Problems
-                      </h3>
-                      
-                      <div className="overflow-x-auto max-h-[360px] overflow-y-auto">
-                        <table className="w-full border-collapse text-xs sm:text-sm">
-                          <thead>
-                            <tr className="border-b border-white/5 text-slate-400 font-bold uppercase tracking-wider text-left">
-                              <th className="pb-3 text-left">Title</th>
-                              <th className="pb-3 text-left">Difficulty</th>
-                              <th className="pb-3 text-left">Topic</th>
-                              <th className="pb-3 text-left">Language</th>
-                              <th className="pb-3 text-left">Status</th>
-                              <th className="pb-3 text-right">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/5">
-                            {dashboardQuestions.map((q) => (
-                              <tr key={q._id} className="hover:bg-white/[0.02] transition-all duration-200">
-                                <td className="py-3 font-semibold text-white max-w-[200px] truncate pr-2">{q.title}</td>
-                                <td className="py-3">
-                                  <span className={`px-2 py-0.5 rounded border text-[9px] uppercase font-bold tracking-wider ${
-                                    q.difficulty === "Easy" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" :
-                                    q.difficulty === "Medium" ? "text-amber-400 bg-amber-500/10 border-amber-500/20" :
-                                    "text-red-400 bg-red-500/10 border-red-500/20"
-                                  }`}>
-                                    {q.difficulty}
-                                  </span>
-                                </td>
-                                <td className="py-3 text-slate-300">{q.topic}</td>
-                                <td className="py-3 text-slate-400 font-mono">{q.language}</td>
-                                <td className="py-3">
-                                  <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold ${
-                                    q.status === "solved" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                                    q.status === "attempted" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                                    "bg-slate-500/10 text-slate-400 border border-white/10"
-                                  }`}>
-                                    {q.status === "solved" ? "Likely Accepted" : q.status === "attempted" ? "Partially Correct" : "Generated"}
-                                  </span>
-                                </td>
-                                <td className="py-3 text-right">
-                                  <button
-                                    onClick={() => handleSelectQuestion(q)}
-                                    className="px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/35 hover:border-indigo-500/60 text-indigo-400 hover:text-indigo-300 font-bold transition-all cursor-pointer"
-                                  >
-                                    Practice
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            ) : (
+            {activeTab === "practice" && (
               /* AI QUESTION GENERATOR & WORKSPACE VIEW */
               generatedQuestion ? (
                 /* ACTIVE QUESTION WORKSPACE (12 Columns) */

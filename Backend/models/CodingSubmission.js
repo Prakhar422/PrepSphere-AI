@@ -82,6 +82,9 @@ const codingSubmissionSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    evaluationDuration: {
+      type: Number
+    },
     submittedAt: {
       type: Date,
       default: Date.now,
@@ -96,6 +99,7 @@ const codingSubmissionSchema = new mongoose.Schema(
 // Optimize query patterns
 codingSubmissionSchema.index({ user: 1, question: 1 });
 codingSubmissionSchema.index({ user: 1, submittedAt: -1 });
+codingSubmissionSchema.index({ createdAt: -1 });
 
 const CodingSubmission = mongoose.model('CodingSubmission', codingSubmissionSchema);
 

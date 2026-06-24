@@ -7,7 +7,9 @@ import Bookmark from '../models/Bookmark.js';
 import Comment from '../models/Comment.js';
 import Report from '../models/Report.js';
 import CodingSubmission from '../models/CodingSubmission.js';
+import CodingQuestion from '../models/CodingQuestion.js';
 import { calculateInterviewStreak } from '../utils/streakUtility.js';
+import { calculateCodingStreaks, generateActivities } from '../utils/codingJourneyHelper.js';
 
 /**
  * @desc    Fetch the summary of the latest resume analysis for the authenticated user
@@ -298,17 +300,17 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
 
     // 3.5. Fetch Coding Journey submissions
     const codingSubmissions = await CodingSubmission.find({ user: userId })
-      .populate('question', 'title topic difficulty')
+      .populate('question')
       .sort({ submittedAt: -1 })
       .lean();
 
-    const uniqueCodingAttemptedIds = new Set(codingSubmissions.map(s => s.question?._id?.toString()).filter(Boolean));
+    const uniqueCodingAttemptedIds = new Set(codingSubmissions.map(s => s.question?._id?.toString() || s.question?.toString()).filter(Boolean));
     const totalCodingAttempted = uniqueCodingAttemptedIds.size;
 
     const uniqueCodingSolvedIds = new Set(
       codingSubmissions
         .filter(s => s.status === 'passed')
-        .map(s => s.question?._id?.toString())
+        .map(s => s.question?._id?.toString() || s.question?.toString())
         .filter(Boolean)
     );
     const totalCodingSolved = uniqueCodingSolvedIds.size;
@@ -317,6 +319,9 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
     const likelyAcceptanceRate = codingSubmissions.length > 0
       ? Math.round((totalPassedCodingSubmissions / codingSubmissions.length) * 100)
       : 0;
+
+    const codingStreaksObj = calculateCodingStreaks(codingSubmissions);
+    const codingStreak = codingStreaksObj.currentStreak;
 
     // 4. Calculate Placement Readiness
     // Weights: Resume (30%), Aptitude (30%), Mock Interview (40%)
@@ -574,16 +579,22 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
     });
 
     // Build Coding Journey activities list
-    const codingActivities = codingSubmissions.map(sub => {
-      const verdictText = sub.status === 'passed' ? 'Likely Accepted' : sub.status === 'partial' ? 'Partially Correct' : 'Likely Wrong Answer';
-      return {
-        desc: `Submitted solution for ${sub.question?.title || 'Coding Challenge'}`,
-        detail: `Verdict: ${verdictText} | Score: ${sub.score}/100`,
-        icon: "Code2",
-        color: sub.status === 'passed' ? "text-emerald-400 bg-emerald-500/10" : sub.status === 'partial' ? "text-amber-400 bg-amber-500/10" : "text-red-400 bg-red-500/10",
-        timestamp: sub.submittedAt
-      };
-    });
+    const codingQuestionsListForActivity = await CodingQuestion.find({
+      $or: [
+        { user: userId },
+        { bookmarkedBy: userId }
+      ]
+    }).lean();
+
+    const rawCodingActivities = generateActivities(codingQuestionsListForActivity, codingSubmissions, userId);
+
+    const codingActivities = rawCodingActivities.map(act => ({
+      desc: act.text,
+      detail: "PrepSphere AI Coding",
+      icon: act.icon || "Code2",
+      color: act.color || "text-emerald-400 bg-emerald-500/10",
+      timestamp: act.timestamp
+    }));
 
     // Merge and sort all activities chronologically, format relative times
     const combinedActivities = [...resumeActivities, ...aptitudeActivities, ...interviewActivities, ...experienceActivities, ...codingActivities]
@@ -647,6 +658,11 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
         likelyAcceptanceRate,
         totalSubmissions: codingSubmissions.length
       },
+      // Root-level Coding Journey metrics requested in Phase 3
+      codingQuestionsSolved: totalCodingSolved,
+      codingQuestionsAttempted: totalCodingAttempted,
+      codingStreak,
+      codingAcceptanceRate: likelyAcceptanceRate,
       readiness,
       activities: combinedActivities.slice(0, 10)
     });

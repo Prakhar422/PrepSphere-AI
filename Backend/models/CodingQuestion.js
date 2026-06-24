@@ -96,7 +96,19 @@ const codingQuestionSchema = new mongoose.Schema(
       type: String,
       enum: ['generated', 'attempted', 'solved'],
       default: 'generated'
-    }
+    },
+    lastSolvedAt: {
+      type: Date
+    },
+    firstSolvedAt: {
+      type: Date
+    },
+    bookmarkedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      }
+    ]
   },
   {
     timestamps: true
