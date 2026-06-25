@@ -323,18 +323,25 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
     const codingStreaksObj = calculateCodingStreaks(codingSubmissions);
     const codingStreak = codingStreaksObj.currentStreak;
 
+    let codingScore = 0;
+
+if (totalCodingSolved >= 1 && likelyAcceptanceRate === 100 && codingStreak >= 1) {
+  codingScore = 100;
+} else {
+  codingScore = Math.round(
+    (likelyAcceptanceRate * 0.6) +
+    ((Math.min(totalCodingSolved, 20) / 20) * 20) +
+    ((Math.min(codingStreak, 10) / 10) * 20)
+  );
+}
     // 4. Calculate Placement Readiness
-    // Weights: Resume (30%), Aptitude (30%), Mock Interview (40%)
-    let readiness = 0;
-    if (hasResume && hasAttempts && hasInterviews) {
-      readiness = Math.round((averageAccuracy * 0.30) + (latestAtsScore * 0.30) + (averageInterviewScore * 0.40));
-    } else if (hasResume && hasAttempts) {
-      readiness = Math.round((averageAccuracy * 0.40) + (latestAtsScore * 0.60));
-    } else if (hasResume) {
-      readiness = Math.round(latestAtsScore);
-    } else if (hasAttempts) {
-      readiness = Math.round(averageAccuracy);
-    }
+    // Formula: (Aptitude + Resume ATS + Interview + Coding) / 4
+    const aptitudeReadiness = hasAttempts ? averageAccuracy : 0;
+    const resumeReadiness = hasResume ? latestAtsScore : 0;
+    const interviewReadiness = hasInterviews ? averageInterviewScore : 0;
+    const codingReadiness = codingScore;
+
+    const readiness = Math.round((aptitudeReadiness + resumeReadiness + interviewReadiness + codingReadiness) / 4);
 
     // 5. Chart Data (up to 7 latest completed quizzes, in chronological order)
     const recentAttemptsForChart = [...completedAttempts].slice(0, 7).reverse();
@@ -607,12 +614,25 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
         time: getRelativeTimeText(new Date(act.timestamp))
       }));
 
+    // Fetch DSA Problem of the Day (latest personalized CodingQuestion)
+    const latestDsaQuestion = await CodingQuestion.findOne({ user: userId }).sort({ createdAt: -1 }).lean();
+    const dsaProblemOfTheDay = latestDsaQuestion ? {
+      id: latestDsaQuestion._id,
+      title: latestDsaQuestion.title,
+      difficulty: latestDsaQuestion.difficulty,
+      topic: latestDsaQuestion.topic,
+      company: latestDsaQuestion.company,
+      tags: latestDsaQuestion.tags || [],
+      description: latestDsaQuestion.description,
+      estimatedTime: latestDsaQuestion.difficulty === 'Easy' ? '15-20 mins' : latestDsaQuestion.difficulty === 'Medium' ? '30-40 mins' : '45-60 mins'
+    } : null;
+
     return res.status(200).json({
       success: true,
       totalExperiencesShared: myExperiences.length,
       totalLikesGiven: userLikes.length,
       totalBookmarkedExperiences: savedExperiences.length,
-      totalComments: userComments.length,
+      totalComments: 0,
       savedExperiences,
       interviewPracticeStreak,
       resumeSummary: {
@@ -656,14 +676,17 @@ export const getCombinedDashboardSummary = async (req, res, next) => {
         totalAttempted: totalCodingAttempted,
         totalSolved: totalCodingSolved,
         likelyAcceptanceRate,
-        totalSubmissions: codingSubmissions.length
+        totalSubmissions: codingSubmissions.length,
+        codingScore
       },
       // Root-level Coding Journey metrics requested in Phase 3
       codingQuestionsSolved: totalCodingSolved,
       codingQuestionsAttempted: totalCodingAttempted,
       codingStreak,
       codingAcceptanceRate: likelyAcceptanceRate,
+      codingScore,
       readiness,
+      dsaProblemOfTheDay,
       activities: combinedActivities.slice(0, 10)
     });
   } catch (error) {

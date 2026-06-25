@@ -99,6 +99,22 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/coding-journey/practice"
+            element={
+              <ProtectedRoute>
+                <CodingJourney />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/coding-journey/history"
+            element={
+              <ProtectedRoute>
+                <CodingJourney />
+              </ProtectedRoute>
+            }
+          />
           
           <Route
             path="/interview-experiences"

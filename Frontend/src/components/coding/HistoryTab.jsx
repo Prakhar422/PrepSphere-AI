@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Star,
@@ -44,6 +45,8 @@ const HistoryTab = ({
   setBookmarkedOnly,
   onClearFilters
 }) => {
+  const navigate = useNavigate();
+
   const handlePrevPage = () => {
     if (currentPage > 1) {
       onPageChange(currentPage - 1);
@@ -68,6 +71,29 @@ const HistoryTab = ({
 
   return (
     <div className="space-y-6 text-left">
+      {/* Back Button & Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+  {/* Left Section */}
+  <div className="space-y-1">
+    <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
+      <Clock className="w-8 h-8 text-indigo-400 animate-pulse" />
+      History Logs
+    </h1>
+
+    <p className="text-sm text-slate-400 font-light mt-1 font-sans">
+      Review your previous coding questions and monitor your progress.
+    </p>
+  </div>
+
+  {/* Right Section */}
+  <button
+    onClick={() => navigate("/coding-journey")}
+    className="flex items-center justify-center px-5 py-2 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white text-sm font-semibold transition-all duration-300 self-start md:self-auto"
+  >
+    Back to Coding Journey
+  </button>
+</div>
+
       {/* Filters Row */}
       <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-5 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -143,12 +143,41 @@ export const generateActivities = (questions, submissions, userId) => {
     }
 
     if (sub.status === 'passed') {
+      // Calculate historical coding score at this timestamp
+      const subTime = new Date(timestamp).getTime();
+      const pastSubmissions = submissions.filter(s => new Date(s.submittedAt || s.createdAt).getTime() <= subTime);
+      
+      const uniqueSolvedIds = new Set(
+        pastSubmissions
+          .filter(s => s.status === 'passed')
+          .map(s => s.question?._id?.toString() || s.question?.toString())
+          .filter(Boolean)
+      );
+      const solvedCount = uniqueSolvedIds.size;
+      
+      const totalPassed = pastSubmissions.filter(s => s.status === 'passed').length;
+      const accRate = pastSubmissions.length > 0 ? Math.round((totalPassed / pastSubmissions.length) * 100) : 0;
+      
+      const streakObj = calculateCodingStreaks(pastSubmissions);
+      const streakVal = streakObj.currentStreak;
+      
+      const histCodingScore = Math.min(100, Math.round(solvedCount * 0.5 + accRate * 0.3 + streakVal * 0.2)) || 0;
+
       activities.push({
         text: `Solved ${q.title}`,
         timestamp,
         type: 'solved',
         icon: 'Code2',
         color: 'text-emerald-400 bg-emerald-500/10'
+      });
+
+      // Insert score increase event with a 1-second offset (1000ms) to ensure it sorts after the solve event
+      activities.push({
+        text: `Coding Score increased to ${histCodingScore}%`,
+        timestamp: new Date(subTime + 1000),
+        type: 'score_increase',
+        icon: 'TrendingUp',
+        color: 'text-cyan-400 bg-cyan-500/10'
       });
     } else if (isImprovement) {
       activities.push({

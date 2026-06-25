@@ -1,20 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
-  Brain,
   Code2,
-  Bookmark,
-  Star,
   Target,
   Flame,
-  Clock,
-  Activity,
   Award,
-  TrendingUp,
-  Briefcase,
-  Layers,
-  Sparkles,
-  Info,
   Calendar,
+  Activity,
+  Layers,
   Loader2
 } from "lucide-react";
 import {
@@ -67,12 +59,67 @@ const AnimatedNumber = ({ value, duration = 1200 }) => {
   return <>{current.toLocaleString()}</>;
 };
 
-const AnalyticsTab = ({ data, loading }) => {
+// Custom Axis Tick for rendering multi-word labels vertically
+const CustomXAxisTick = ({ x, y, payload }) => {
+  if (!payload || !payload.value) return null;
+  const words = payload.value.split(" ");
+  return (
+    <text x={x} y={y + 10} textAnchor="middle" fill="#64748b" fontSize={9} className="font-sans font-medium">
+      {words.map((word, index) => (
+        <tspan key={index} x={x} dy={index === 0 ? 0 : "1.2em"}>
+          {word}
+        </tspan>
+      ))}
+    </text>
+  );
+};
+
+// Custom Marker Dot for Area Chart that hides dots for zero values
+const CustomDot = (props) => {
+  const { cx, cy, value } = props;
+  if (!value || value === 0) return null;
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={4}
+      stroke="#a855f7"
+      strokeWidth={2}
+      fill="#080e24"
+    />
+  );
+};
+
+const ALL_CATEGORIES = [
+  "Arrays", "Strings", "Linked Lists", "Stack", "Queue", "Trees", "Graphs", 
+  "Greedy", "Dynamic Programming", "Recursion", "Binary Search", "Hashing", 
+  "Heap", "Backtracking", "Bit Manipulation", "Math", "Sliding Window", "Two Pointer"
+];
+
+const COLORS_DIFFICULTY = {
+  Easy: "#10b981",
+  Medium: "#f59e0b",
+  Hard: "#ef4444"
+};
+
+const COLORS_GENERIC = [
+  "#6366f1",
+  "#a855f7",
+  "#ec4899",
+  "#06b6d4",
+  "#10b981",
+  "#f59e0b",
+  "#3b82f6",
+  "#14b8a6",
+  "#8b5cf6"
+];
+
+const AnalyticsTab = ({ data, dashboardData, loading }) => {
   if (loading) {
     return (
       <div className="h-[400px] flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-        <p className="text-sm text-slate-400 font-mono">Loading practice analytics...</p>
+        <p className="text-sm text-slate-400 font-mono">Loading coding analytics...</p>
       </div>
     );
   }
@@ -93,221 +140,436 @@ const AnalyticsTab = ({ data, loading }) => {
     );
   }
 
-  // Color schemes
-  const COLORS_DIFFICULTY = {
-    Easy: "#10b981",
-    Medium: "#f59e0b",
-    Hard: "#ef4444"
-  };
-
-  const COLORS_GENERIC = [
-    "#6366f1",
-    "#a855f7",
-    "#ec4899",
-    "#06b6d4",
-    "#10b981",
-    "#f59e0b",
-    "#3b82f6",
-    "#14b8a6",
-    "#8b5cf6"
+  // 1. Stats Cards data
+  const statsCards = [
+    {
+      title: "Total Problems Solved",
+      value: data.totalQuestionsSolved || 0,
+      suffix: "",
+      subtitle: "Lifetime problems solved",
+      icon: Target,
+      accentColor: "blue",
+      textGradient: "from-blue-400 to-indigo-400",
+      subtitleColorClass: "text-blue-400",
+      iconBg: "bg-blue-500/10",
+      iconColor: "text-blue-400"
+    },
+    {
+      title: "Total Submissions",
+      value: data.totalSubmissions || 0,
+      suffix: "",
+      subtitle: "Evaluation runs submitted",
+      icon: Code2,
+      accentColor: "purple",
+      textGradient: "from-indigo-400 to-purple-400",
+      subtitleColorClass: "text-purple-400",
+      iconBg: "bg-purple-500/10",
+      iconColor: "text-purple-400"
+    },
+    {
+      title: "Acceptance Rate",
+      value: data.acceptanceRate || 0,
+      suffix: "%",
+      subtitle: "Average success percentage",
+      icon: Award,
+      accentColor: "cyan",
+      textGradient: "from-cyan-400 to-blue-400",
+      subtitleColorClass: "text-cyan-400",
+      iconBg: "bg-cyan-500/10",
+      iconColor: "text-cyan-400"
+    },
+    {
+      title: "Current Streak",
+      value: data.currentStreak || 0,
+      suffix: (data.currentStreak || 0) === 1 ? " Day" : " Days",
+      subtitle: "Consecutive practice days",
+      icon: Flame,
+      accentColor: "pink",
+      textGradient: "from-purple-400 to-pink-400",
+      subtitleColorClass: "text-pink-400",
+      iconBg: "bg-pink-500/10",
+      iconColor: "text-pink-400"
+    }
   ];
 
-  // Prep Difficulty Distribution for Pie Chart
-  const pieDifficultyData = (data.difficultyDistribution || []).map(item => ({
-    name: item.name,
-    value: item.count,
-    color: COLORS_DIFFICULTY[item.name] || "#6366f1"
-  }));
+  // 2. Prep Difficulty Distribution for Pie Chart
+  const pieDifficultyData = useMemo(() => {
+    const rawDist = data.difficultyDistribution || [];
+    const counts = { Easy: 0, Medium: 0, Hard: 0 };
+    rawDist.forEach(item => {
+      if (counts[item.name] !== undefined) {
+        counts[item.name] = item.count || item.value || 0;
+      }
+    });
+    return [
+      { name: "Easy", value: counts.Easy, color: COLORS_DIFFICULTY.Easy },
+      { name: "Medium", value: counts.Medium, color: COLORS_DIFFICULTY.Medium },
+      { name: "Hard", value: counts.Hard, color: COLORS_DIFFICULTY.Hard }
+    ];
+  }, [data.difficultyDistribution]);
 
-  // Prep Language Distribution for Pie Chart
-  const pieLanguageData = (data.languageDistribution || []).map((item, idx) => ({
-    name: item.name,
-    value: item.count,
-    color: COLORS_GENERIC[idx % COLORS_GENERIC.length]
-  }));
+  const totalSolvedDifficulty = useMemo(() => {
+    return pieDifficultyData.reduce((acc, curr) => acc + curr.value, 0);
+  }, [pieDifficultyData]);
 
-  // Prep Category Distribution for Horizontal Bar Chart
-  const barCategoryData = (data.categoryDistribution || []).map((item, idx) => ({
-    name: item.name,
-    count: item.count,
-    fill: COLORS_GENERIC[idx % COLORS_GENERIC.length]
-  }));
+  // Prep Category Distribution for exactly 10 target categories
+  const barCategoryData = useMemo(() => {
+    const rawDist = data.categoryDistribution || [];
+    const categoriesOrder = [
+      "Arrays",
+      "Strings",
+      "Linked Lists",
+      "Trees",
+      "Graphs",
+      "Dynamic Programming",
+      "Binary Search",
+      "Sliding Window",
+      "Heap",
+      "Greedy"
+    ];
+
+    const counts = {
+      "Arrays": 0,
+      "Strings": 0,
+      "Linked Lists": 0,
+      "Trees": 0,
+      "Graphs": 0,
+      "Dynamic Programming": 0,
+      "Binary Search": 0,
+      "Sliding Window": 0,
+      "Heap": 0,
+      "Greedy": 0
+    };
+
+    rawDist.forEach(item => {
+      let name = item.name;
+      if (name === "Linked List") name = "Linked Lists";
+      const val = item.count || item.value || 0;
+
+      if (counts[name] !== undefined) {
+        counts[name] += val;
+      }
+    });
+
+    return categoriesOrder.map((name, idx) => ({
+      name,
+      count: counts[name],
+      fill: COLORS_GENERIC[idx % COLORS_GENERIC.length]
+    }));
+  }, [data.categoryDistribution]);
+
+  const maxCategoryValue = useMemo(() => {
+    if (barCategoryData.length === 0) return 0;
+    return Math.max(...barCategoryData.map(d => d.count), 0);
+  }, [barCategoryData]);
+
+  // 3. Weekly Practice Sorted Chronologically (Mon - Sun)
+  const weeklyPracticeSorted = useMemo(() => {
+    const rawWeekly = data.weeklyPractice || [];
+    const daysOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const countsMap = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+    
+    rawWeekly.forEach(item => {
+      const dayName = item.name || item.day;
+      if (dayName && countsMap[dayName] !== undefined) {
+        countsMap[dayName] = item.count || item.solved || 0;
+      }
+    });
+    
+    return daysOrder.map(day => ({
+      name: day,
+      count: countsMap[day]
+    }));
+  }, [data.weeklyPractice]);
+
+  const weeklyTotal = useMemo(() => {
+    return weeklyPracticeSorted.reduce((acc, curr) => acc + curr.count, 0);
+  }, [weeklyPracticeSorted]);
+
+  // 4. Monthly Progress - Solved Questions aggregated from database questions list
+  const monthlyChartData = useMemo(() => {
+    const questions = dashboardData?.questions || [];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthlyCounts = {};
+    
+    const now = new Date();
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mName = months[d.getMonth()];
+      const year = d.getFullYear().toString().substring(2);
+      const label = `${mName} '${year}`;
+      last6Months.push(label);
+      monthlyCounts[label] = 0;
+    }
+    
+    questions.forEach(q => {
+      if (q.status === "solved" && q.lastSolvedAt) {
+        const d = new Date(q.lastSolvedAt);
+        const mName = months[d.getMonth()];
+        const year = d.getFullYear().toString().substring(2);
+        const label = `${mName} '${year}`;
+        if (monthlyCounts[label] !== undefined) {
+          monthlyCounts[label]++;
+        }
+      }
+    });
+    
+    return last6Months.map(label => ({
+      name: label,
+      count: monthlyCounts[label]
+    }));
+  }, [dashboardData?.questions]);
+
+  // 5. Recent Activity List
+  const recentActivityList = dashboardData?.recentActivity || [];
 
   return (
     <div className="space-y-8 text-left">
-      {/* GRID WIDGETS */}
+      {/* 1. STATISTIC CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Streak widgets */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 relative overflow-hidden group hover:border-indigo-500/25 transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Streaks</span>
-            <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400">
-              <Flame className="w-4 h-4 animate-pulse" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">
-              <AnimatedNumber value={data.currentStreak} />
-            </span>
-            <span className="text-xs text-slate-400 font-mono">Current /</span>
-            <span className="text-sm font-bold text-orange-400 font-mono">{data.longestStreak} max</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500">
-            <span>Consecutive unique practice days</span>
-          </div>
-        </div>
+        {statsCards.map((card, i) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={i}
+              className={`relative bg-white/[0.02] border border-white/10 rounded-3xl p-5 text-left overflow-hidden backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] group ${
+                card.accentColor === "blue" ? "hover:border-blue-500/25" :
+                card.accentColor === "purple" ? "hover:border-purple-500/25" :
+                card.accentColor === "cyan" ? "hover:border-cyan-500/25" :
+                "hover:border-pink-500/25"
+              }`}
+            >
+              {/* Top border glow accent */}
+              <div className={`absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent to-transparent ${
+                card.accentColor === "blue" ? "via-blue-500/20" :
+                card.accentColor === "purple" ? "via-purple-500/20" :
+                card.accentColor === "cyan" ? "via-cyan-500/20" :
+                "via-pink-500/20"
+              }`} />
 
-        {/* Problems Attempted vs Solved */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 relative overflow-hidden group hover:border-emerald-500/25 transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Solved Problems</span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
-              <Target className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-indigo-400">
-              <AnimatedNumber value={data.totalQuestionsSolved} />
-            </span>
-            <span className="text-xs text-slate-400 font-mono">/ <AnimatedNumber value={data.totalQuestionsAttempted} /> attempted</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500">
-            <span>Overall solved vs attempted questions</span>
-          </div>
-        </div>
+              <div className="flex justify-between items-start">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  {card.title}
+                </span>
+                <div className={`p-1.5 rounded-lg ${card.iconBg} ${card.iconColor}`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+              </div>
 
-        {/* Acceptance & Score */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 relative overflow-hidden group hover:border-cyan-500/25 transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Acceptance &amp; Score</span>
-            <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-              <Award className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">
-              <AnimatedNumber value={data.acceptanceRate} />%
-            </span>
-            <span className="text-xs text-slate-400 font-mono">Avg Score:</span>
-            <span className="text-sm font-bold text-indigo-400 font-mono">{data.averageScore}</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500 flex justify-between">
-            <span>High Score: {data.highestScore}</span>
-            <span>Total: {data.totalSubmissions} attempts</span>
-          </div>
-        </div>
+              <div className="mt-4 flex items-baseline space-x-1">
+                <span className={`text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r ${card.textGradient}`}>
+                  <AnimatedNumber value={card.value} />
+                </span>
+                {card.suffix && (
+                  <span className="text-xs text-slate-400 font-semibold">
+                    {card.suffix}
+                  </span>
+                )}
+              </div>
 
-        {/* Bookmarks & Generated today */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 relative overflow-hidden group hover:border-pink-500/25 transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bookmarked &amp; Daily</span>
-            <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
-              <Bookmark className="w-4 h-4" />
+              <div className={`mt-2 text-xs font-semibold ${card.subtitleColorClass}`}>
+                {card.subtitle}
+              </div>
             </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">
-              <AnimatedNumber value={data.questionsBookmarked} />
-            </span>
-            <span className="text-xs text-slate-400 font-mono">saved /</span>
-            <span className="text-sm font-bold text-white font-mono">{data.questionsGeneratedToday} today</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500">
-            <span>Total Generated: {data.totalQuestionsGenerated}</span>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
-      {/* Favorites & Consistency Info Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Favorites Card */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 relative overflow-hidden text-left shadow-md">
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
-            Practice Favorites
-          </h4>
-          <div className="space-y-3.5 text-xs text-slate-300">
-            <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-              <span className="text-slate-500 font-semibold">Topic</span>
-              <span className="font-bold text-white text-right">{data.favoriteTopic}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-              <span className="text-slate-500 font-semibold">Company</span>
-              <span className="font-bold text-white text-right">{data.favoriteCompany}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-              <span className="text-slate-500 font-semibold">Language</span>
-              <span className="font-bold text-indigo-400 text-right">{data.favoriteLanguage}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Efficiency Card */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 relative overflow-hidden text-left shadow-md">
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
-            Consistency Metrics
-          </h4>
-          <div className="space-y-3.5 text-xs text-slate-300">
-            <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-              <span className="text-slate-500 font-semibold">Most Active Day</span>
-              <span className="font-bold text-white text-right">{data.mostActiveDay}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-              <span className="text-slate-500 font-semibold">Least Active Day</span>
-              <span className="font-bold text-white text-right">{data.leastActiveDay}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
-              <span className="text-slate-500 font-semibold">Submissions / Day</span>
-              <span className="font-bold text-indigo-400 text-right font-mono">{data.averageSubmissionsPerDay}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Milestones / Slogan */}
-        <div className="bg-indigo-950/10 border border-indigo-500/20 rounded-2xl p-5 relative overflow-hidden text-left flex flex-col justify-between shadow-md">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-2xl rounded-full" />
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              Practice Insights
-            </h4>
-            <p className="text-xs text-slate-300 leading-relaxed font-light font-sans pt-1">
-              "Consistency is the secret to mastering programming interfaces. Solve at least one DSA challenge every day to expand your algorithmic toolkit."
-            </p>
-          </div>
-          <div className="pt-2 text-[10px] text-indigo-300/60 font-semibold font-mono uppercase tracking-wider">
-            PrepSphere AI algorithms Team
-          </div>
-        </div>
-      </div>
-
-      {/* CHARTS GRID */}
+      {/* 2. CHARTS SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Weekly Consistency Area Chart */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-indigo-400" />
-            Weekly Practice Consistency
+        {/* Left Chart: Solved by Difficulty */}
+        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg space-y-4 flex flex-col justify-between">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent pointer-events-none" />
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Problems Solved by Difficulty
           </h3>
+
+          {totalSolvedDifficulty > 0 ? (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 py-4">
+              <div className="h-[150px] w-[150px] shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip
+                      contentStyle={{
+                        background: "#080e24",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        borderRadius: "12px"
+                      }}
+                    />
+                    <Pie
+                      data={pieDifficultyData.filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={60}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {pieDifficultyData.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              
+              <div className="flex-1 space-y-2 text-xs text-slate-300 w-full">
+                {pieDifficultyData.map((item, idx) => {
+                  const pct = totalSolvedDifficulty > 0 ? Math.round((item.value / totalSolvedDifficulty) * 100) : 0;
+                  return (
+                    <div key={idx} className="flex items-center justify-between border-b border-white/5 pb-1">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="font-semibold text-slate-300">{item.name}</span>
+                      </div>
+                      <span className="font-mono font-bold text-white">
+                        {item.value} ({pct}%)
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center text-slate-500 text-xs italic text-center w-full">
+              No problems solved yet.
+            </div>
+          )}
+        </div>
+
+        {/* Right Chart: Solved by Category */}
+        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg space-y-4">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent pointer-events-none" />
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Problems Solved by Category
+          </h3>
+          
+          <div className="w-full overflow-x-auto pb-2 scrollbar-thin">
+            <div style={{ minWidth: `${Math.max(barCategoryData.length * 70, 560)}px`, height: "250px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barCategoryData}
+                  margin={{ top: 10, right: 10, left: -25, bottom: 20 }}
+                  barCategoryGap="10%"
+                  barGap={2}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={<CustomXAxisTick />}
+                    interval={0}
+                    stroke="#64748b"
+                    tickLine={false}
+                    height={50}
+                    tickMargin={12}
+                  />
+                  <YAxis
+                    type="number"
+                    stroke="#64748b"
+                    fontSize={10}
+                    tickLine={false}
+                    allowDecimals={false}
+                    tickCount={Math.max(maxCategoryValue + 1, 5)}
+                    domain={[0, 'dataMax']}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#080e24",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      borderRadius: "12px"
+                    }}
+                    itemStyle={{ color: "#fff" }}
+                  />
+                  <Bar
+                    dataKey="count"
+                    radius={[8, 8, 0, 0]}
+                    barSize={40}
+                    maxBarSize={50}
+                  >
+                    {barCategoryData.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. WEEKLY PRACTICE & 4. MONTHLY PROGRESS GRAPHS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Weekly Practice Section */}
+        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg space-y-4">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent pointer-events-none" />
+          <div className="flex justify-between items-center">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-indigo-400" />
+              Weekly Practice
+            </h3>
+            <span className="text-[10px] sm:text-xs font-extrabold text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+              Total Solved This Week: {weeklyTotal}
+            </span>
+          </div>
+          
           <div className="h-[220px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.weeklyPractice} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+              <BarChart data={weeklyPracticeSorted} margin={{ top: 10, right: 10, left: -25, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
+                <YAxis
+                  stroke="#64748b"
+                  fontSize={10}
+                  tickLine={false}
+                  allowDecimals={false}
+                  tickCount={Math.max(Math.max(...weeklyPracticeSorted.map(d => d.count), 0) + 1, 5)}
+                  domain={[0, 'dataMax']}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "#080e24",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "12px"
+                  }}
+                  itemStyle={{ color: "#fff" }}
+                />
+                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Monthly Progress Section */}
+        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg space-y-4">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent pointer-events-none" />
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Monthly Progress
+          </h3>
+          
+          <div className="h-[220px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyChartData} margin={{ top: 10, right: 10, left: -25, bottom: 5 }}>
                 <defs>
-                  <linearGradient id="colorWeekly" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  <linearGradient id="colorSolved" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} allowDecimals={false} />
+                <YAxis
+                  stroke="#64748b"
+                  fontSize={10}
+                  tickLine={false}
+                  allowDecimals={false}
+                  tickCount={Math.max(Math.max(...monthlyChartData.map(d => d.count), 0) + 1, 5)}
+                  domain={[0, 'dataMax']}
+                />
                 <Tooltip
                   contentStyle={{
                     background: "#080e24",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
                     borderRadius: "12px"
                   }}
                   itemStyle={{ color: "#fff" }}
@@ -315,244 +577,95 @@ const AnalyticsTab = ({ data, loading }) => {
                 <Area
                   type="monotone"
                   dataKey="count"
-                  name="Submissions"
-                  stroke="#6366f1"
-                  strokeWidth={2.5}
+                  name="Solved"
+                  stroke="#a855f7"
+                  strokeWidth={3}
                   fillOpacity={1}
-                  fill="url(#colorWeekly)"
+                  fill="url(#colorSolved)"
+                  dot={<CustomDot />}
+                  activeDot={{ r: 6 }}
+                  animationDuration={1500}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* Monthly Progress Line Chart */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-purple-400" />
-            Monthly Progress (Submissions / Day)
-          </h3>
-          <div className="h-[220px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.monthlyPractice} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#080e24",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "12px"
-                  }}
-                  itemStyle={{ color: "#fff" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  name="Submissions"
-                  stroke="#a855f7"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Score Improvement Trend Line Chart */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            Score Improvement Trend (Highest Score)
-          </h3>
-          <div className="h-[220px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.scoreImprovementTrend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} domain={[0, 100]} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#080e24",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "12px"
-                  }}
-                  itemStyle={{ color: "#fff" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="score"
-                  name="Max Score"
-                  stroke="#10b981"
-                  strokeWidth={2.5}
-                  dot={false}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Problem Categories Horizontal Bar Chart */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-cyan-400" />
-            Solved by Topic Categories
-          </h3>
-          <div className="h-[220px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={barCategoryData} margin={{ top: 10, right: 10, left: 40, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={true} vertical={false} />
-                <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} width={100} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#080e24",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "12px"
-                  }}
-                  itemStyle={{ color: "#fff" }}
-                />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={8}>
-                  {barCategoryData.map((entry, idx) => (
-                    <Cell key={`cell-${idx}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Solved by Difficulty Pie Chart */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-400" />
-            Solved by Difficulty
-          </h3>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="h-[150px] w-[150px] shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip
-                    contentStyle={{
-                      background: "#080e24",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "12px"
-                    }}
-                  />
-                  <Pie
-                    data={pieDifficultyData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={35}
-                    outerRadius={55}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {pieDifficultyData.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex-1 space-y-2 text-xs text-slate-300 w-full">
-              {pieDifficultyData.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="font-medium text-slate-300">{item.name}</span>
-                  </div>
-                  <span className="font-mono font-bold text-white">{item.value} submissions</span>
-                </div>
-              ))}
-              {pieDifficultyData.length === 0 && (
-                <div className="text-slate-500 italic">No difficulty stats.</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Language Usage Pie Chart */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Code2 className="w-4 h-4 text-indigo-400" />
-            Programming Languages Usage
-          </h3>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="h-[150px] w-[150px] shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip
-                    contentStyle={{
-                      background: "#080e24",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "12px"
-                    }}
-                  />
-                  <Pie
-                    data={pieLanguageData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={35}
-                    outerRadius={55}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {pieLanguageData.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex-1 space-y-2 text-xs text-slate-300 w-full">
-              {pieLanguageData.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="font-medium text-slate-300">{item.name}</span>
-                  </div>
-                  <span className="font-mono font-bold text-white">{item.value} submissions</span>
-                </div>
-              ))}
-              {pieLanguageData.length === 0 && (
-                <div className="text-slate-500 italic">No language stats.</div>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* ACTIVITY TIMELINE */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left shadow-lg">
-        <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-6">
-          <Clock className="w-5 h-5 text-indigo-400" />
-          Coding Journey Activities Feed
+      {/* 5. RECENT ACTIVITY TABLE */}
+      <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg space-y-4">
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent pointer-events-none" />
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          Recent Activity
         </h3>
 
-        <div className="relative border-l border-white/5 ml-3 pl-5 space-y-6">
-          {(!data.recentActivities || data.recentActivities.length === 0) ? (
-            <p className="text-xs text-slate-500 italic py-4">No recent activities logs.</p>
-          ) : (
-            data.recentActivities.map((act, idx) => (
-              <div key={idx} className="relative text-left text-xs sm:text-sm">
-                <div
-                  className={`absolute -left-[26px] top-1 w-2.5 h-2.5 rounded-full border border-[#050B1F] ${act.color || "bg-indigo-500"}`}
-                />
-                <div className="space-y-0.5">
-                  <p className="font-bold text-white leading-relaxed">
-                    {act.text}
-                  </p>
-                  <p className="text-[10px] font-semibold text-slate-400 font-mono">
-                    {act.time}
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        {(!recentActivityList || recentActivityList.length === 0) ? (
+          <div className="text-center py-8 text-slate-500 text-xs italic">
+            No recent activity available.
+          </div>
+        ) : (
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[600px]">
+              <thead>
+                <tr className="border-b border-white/5 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                  <th className="pb-3 pl-2">Problem Name</th>
+                  <th className="pb-3">Difficulty</th>
+                  <th className="pb-3">Category</th>
+                  <th className="pb-3">Score</th>
+                  <th className="pb-3">Submission Result</th>
+                  <th className="pb-3 pr-2">Submitted Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-slate-300 font-medium">
+                {recentActivityList.map((act, idx) => {
+                  const problemName = act.text.replace("Submitted solution for ", "").replace("Improved score on ", "");
+                  const questionObj = (dashboardData?.questions || []).find(q => q.title === problemName);
+                  const category = questionObj ? questionObj.topic : "Arrays";
+                  
+                  return (
+                    <tr key={idx} className="hover:bg-white/[0.01] transition-colors group">
+                      <td className="py-3.5 pl-2 text-white font-bold group-hover:text-indigo-400 transition-colors">
+                        {problemName}
+                      </td>
+                      <td className="py-3.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
+                          act.difficulty === "Easy"
+                            ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                            : act.difficulty === "Medium"
+                              ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                              : "text-red-400 bg-red-500/10 border-red-500/20"
+                        }`}>
+                          {act.difficulty}
+                        </span>
+                      </td>
+                      <td className="py-3.5 font-mono text-xs text-slate-400">
+                        {category}
+                      </td>
+                      <td className="py-3.5 font-mono font-bold text-white">
+                        {act.score !== undefined ? `${act.score}/100` : "N/A"}
+                      </td>
+                      <td className="py-3.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                          act.verdict === "Likely Accepted" || act.verdict === "Accepted" || act.verdict === "passed"
+                            ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                            : act.verdict === "Partially Correct" || act.verdict === "partial"
+                              ? "text-amber-400 border-amber-500/20 bg-amber-500/5"
+                              : "text-red-400 border-red-500/20 bg-red-500/5"
+                        }`}>
+                          {act.verdict === "Likely Accepted" || act.verdict === "passed" ? "Accepted" :
+                           act.verdict === "Partially Correct" || act.verdict === "partial" ? "Partial" : "Wrong Answer"}
+                        </span>
+                      </td>
+                      <td className="py-3.5 pr-2 font-mono text-xs text-slate-400">
+                        {act.time}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

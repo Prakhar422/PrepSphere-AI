@@ -59,7 +59,8 @@ import {
   Award as MedalIcon,
   Check,
   ChevronDown,
-  UserIcon
+  UserIcon,
+  Search
 } from "lucide-react";
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
@@ -777,7 +778,393 @@ const MockInterview = () => {
     setDownloadError("");
     
     try {
-      generateInterviewReportPDF(activeReport, user, { autoSave: true, config });
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "pt",
+        format: "a4"
+      });
+      
+      let currentY = 50;
+      
+      const checkPage = (neededSpace) => {
+        if (currentY + neededSpace > 780) {
+          doc.addPage();
+          currentY = 50;
+        }
+      };
+      
+      // Page Top Accent Line
+      doc.setDrawColor(99, 102, 241); // indigo-500
+      doc.setLineWidth(3);
+      doc.line(40, 45, 555, 45);
+      
+      // Header branding
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(99, 102, 241);
+      doc.text("PREPSPHERE AI", 40, 60);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text("AI Mock Interview Report", 40, 85);
+      
+      // Metadata completion date and candidate
+      const dateStr = activeReport.completedAt 
+        ? new Date(activeReport.completedAt).toLocaleDateString("en-US", { 
+            month: "long", 
+            day: "numeric", 
+            year: "numeric", 
+            hour: "2-digit", 
+            minute: "2-digit" 
+          }) 
+        : new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+        
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text(`Completion Date: ${dateStr}`, 40, 102);
+      
+      const candidateName = user?.name || user?.username || "Candidate";
+      doc.text(`Candidate Name: ${candidateName}`, 40, 114);
+      
+      currentY = 135;
+      
+      // Interview Details Panel Box
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(1);
+      doc.rect(40, currentY, 515, 105, "FD");
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("INTERVIEW DETAILS", 50, currentY + 18);
+      
+      let detailsY = currentY + 36;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 116, 139); // slate-500
+      
+      doc.text("Interview Type:", 50, detailsY);
+      doc.text("Target Company:", 50, detailsY + 15);
+      doc.text("Target Role:", 50, detailsY + 30);
+      doc.text("Difficulty:", 50, detailsY + 45);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(String(activeReport.interviewType || activeReport.category || config.category || "Technical"), 150, detailsY);
+      doc.text(String(activeReport.company || config.company || "N/A"), 150, detailsY + 15);
+      doc.text(String(activeReport.role || config.jobRole || "N/A"), 150, detailsY + 30);
+      doc.text(String(activeReport.difficulty || config.difficulty || "Medium"), 150, detailsY + 45);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text("Duration Limit:", 300, detailsY);
+      doc.text("Language:", 300, detailsY + 15);
+      doc.text("Resume Personalization:", 300, detailsY + 30);
+      doc.text("Status:", 300, detailsY + 45);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${activeReport.duration || config.duration || 30} Minutes`, 430, detailsY);
+      doc.text(String(activeReport.language || config.language || "English"), 430, detailsY + 15);
+      doc.text(activeReport.resumeEnabled ? "Enabled" : "Disabled", 430, detailsY + 30);
+      doc.setTextColor(22, 163, 74); // green-600
+      doc.text("Completed", 430, detailsY + 45);
+      
+      currentY = currentY + 105 + 25;
+      
+      // Overall Performance & Skill Assessment side-by-side
+      checkPage(140);
+      
+      // Left Col: Overall Performance Card
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(40, currentY, 240, 130, "FD");
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text("OVERALL PERFORMANCE", 50, currentY + 18);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(28);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      const scoreVal = activeReport.overallScore ?? activeReport.score ?? 0;
+      doc.text(`${scoreVal}%`, 50, currentY + 52);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      const readiness = activeReport.readinessLevel || activeReport.recommendation || "Developing";
+      doc.text(readiness, 50, currentY + 74);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Questions Attempted: ${activeReport.totalQuestions || 15}`, 50, currentY + 92);
+      doc.text(`Questions Answered: ${activeReport.answeredQuestions || activeReport.totalQuestions || 15}`, 50, currentY + 104);
+      doc.text(`Completion Rate: 100%`, 50, currentY + 116);
+      
+      // Right Col: Skill Assessment using progress bars
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text("SKILL ASSESSMENT", 315, currentY + 12);
+      
+      const { radarData } = getAdaptiveMetrics(activeReport);
+      let barY = currentY + 28;
+      
+      radarData.forEach((metric) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+        doc.text(metric.subject, 315, barY);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text(`${metric.value}%`, 555, barY, { align: "right" });
+        
+        // Draw progress bar bg
+        doc.setFillColor(241, 245, 249);
+        doc.rect(315, barY + 4, 240, 6, "F");
+        
+        // Progress fill
+        doc.setFillColor(99, 102, 241);
+        const fillWidth = (metric.value / 100) * 240;
+        doc.rect(315, barY + 4, fillWidth, 6, "F");
+        
+        barY += 19;
+      });
+      
+      currentY = currentY + 130 + 25;
+      
+      // Strengths Identified
+      checkPage(70);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(22, 163, 74); // green-600
+      doc.text("AI Strengths Identified", 40, currentY);
+      currentY += 15;
+      
+      const strengths = activeReport.strengths || [];
+      if (strengths.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("- No strengths documented.", 50, currentY);
+        currentY += 15;
+      } else {
+        strengths.forEach((str) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(51, 65, 85);
+          const lines = doc.splitTextToSize(`• ${str}`, 505);
+          checkPage(lines.length * 13 + 5);
+          doc.text(lines, 40, currentY);
+          currentY += lines.length * 13 + 3;
+        });
+      }
+      currentY += 12;
+      
+      // Areas for Improvement
+      checkPage(70);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(220, 38, 38); // red-600
+      doc.text("Areas for Improvement", 40, currentY);
+      currentY += 15;
+      
+      const weaknesses = activeReport.weaknesses || [];
+      if (weaknesses.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("- No improvement areas documented.", 50, currentY);
+        currentY += 15;
+      } else {
+        weaknesses.forEach((weak) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(51, 65, 85);
+          const lines = doc.splitTextToSize(`• ${weak}`, 505);
+          checkPage(lines.length * 13 + 5);
+          doc.text(lines, 40, currentY);
+          currentY += lines.length * 13 + 3;
+        });
+      }
+      currentY += 12;
+      
+      // Recommendations
+      checkPage(70);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.text("AI Recommendations & Next Steps", 40, currentY);
+      currentY += 15;
+      
+      const recs = activeReport.recommendations || [];
+      if (recs.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("- No specific recommendations documented.", 50, currentY);
+        currentY += 15;
+      } else {
+        recs.forEach((rec, idx) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(51, 65, 85);
+          const lines = doc.splitTextToSize(`${idx + 1}. ${rec}`, 505);
+          checkPage(lines.length * 13 + 5);
+          doc.text(lines, 40, currentY);
+          currentY += lines.length * 13 + 3;
+        });
+      }
+      currentY += 18;
+      
+      // Question-by-Question Review Table
+      checkPage(80);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text("Question-by-Question Review Summary", 40, currentY);
+      currentY += 15;
+      
+      // Draw Table Header
+      doc.setFillColor(79, 70, 229);
+      doc.rect(40, currentY, 515, 20, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text("Q#", 43, currentY + 13);
+      doc.text("Question", 68, currentY + 13);
+      doc.text("Candidate Answer", 243, currentY + 13);
+      doc.text("Score", 463, currentY + 13);
+      doc.text("Status", 508, currentY + 13);
+      currentY += 20;
+      
+      const questionsReviewed = activeReport.questionsReviewed || [];
+      questionsReviewed.forEach((q, idx) => {
+        const qLines = doc.splitTextToSize(q.question || "", 170);
+        const aLines = doc.splitTextToSize(q.answer || "", 215);
+        const textHeight = Math.max(qLines.length, aLines.length) * 11;
+        const rowHeight = Math.max(22, textHeight + 10);
+        
+        if (currentY + rowHeight > 780) {
+          doc.setDrawColor(226, 232, 240);
+          doc.line(40, currentY, 555, currentY);
+          
+          doc.addPage();
+          currentY = 50;
+          
+          // Re-draw Table Header
+          doc.setFillColor(79, 70, 229);
+          doc.rect(40, currentY, 515, 20, "F");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8.5);
+          doc.setTextColor(255, 255, 255);
+          doc.text("Q#", 43, currentY + 13);
+          doc.text("Question", 68, currentY + 13);
+          doc.text("Candidate Answer", 243, currentY + 13);
+          doc.text("Score", 463, currentY + 13);
+          doc.text("Status", 508, currentY + 13);
+          currentY += 20;
+        }
+        
+        // Alternating row colors
+        if (idx % 2 === 0) {
+          doc.setFillColor(255, 255, 255);
+        } else {
+          doc.setFillColor(248, 250, 252);
+        }
+        doc.rect(40, currentY, 515, rowHeight, "F");
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(51, 65, 85);
+        
+        // Q#
+        doc.setFont("helvetica", "bold");
+        doc.text(`Q${idx + 1}`, 43, currentY + 14);
+        doc.setFont("helvetica", "normal");
+        
+        // Question
+        doc.text(qLines, 68, currentY + 14);
+        
+        // Candidate Answer
+        doc.text(aLines, 243, currentY + 14);
+        
+        // Score
+        const percentScore = q.score || 0;
+        doc.setFont("helvetica", "bold");
+        doc.text(`${percentScore}%`, 463, currentY + 14);
+        doc.setFont("helvetica", "normal");
+        
+        // Status
+        const statusText = percentScore >= 80 ? "Pass" : percentScore >= 60 ? "Developing" : "Needs work";
+        const statusColor = percentScore >= 80 ? [22, 163, 74] : percentScore >= 60 ? [217, 119, 6] : [220, 38, 38];
+        doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+        doc.setFont("helvetica", "bold");
+        doc.text(statusText, 508, currentY + 14);
+        
+        // Separator line
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.5);
+        doc.line(40, currentY + rowHeight, 555, currentY + rowHeight);
+        
+        currentY += rowHeight;
+      });
+      currentY += 18;
+      
+      // Concluding AI Summary
+      checkPage(80);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.text("AI Summary & Concluding Feedback", 40, currentY);
+      currentY += 15;
+      
+      const conclusionText = activeReport.overallFeedback || activeReport.interviewSummary || "Mock interview evaluation successfully compiled.";
+      const conclusionLines = doc.splitTextToSize(conclusionText, 505);
+      checkPage(conclusionLines.length * 13 + 5);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+      doc.text(conclusionLines, 40, currentY);
+      
+      // running Headers & Footers
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        
+        // Running Header
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184); // slate-400
+        doc.text("PrepSphere AI – Mock Interview Report", 40, 25);
+        
+        // Running Footer
+        doc.text(`Page ${i} of ${totalPages}`, 555, 820, { align: "right" });
+        doc.text("Confidential – Prepared by PrepSphere AI Engine", 40, 820);
+        
+        // Header & Footer lines
+        doc.setDrawColor(241, 245, 249);
+        doc.setLineWidth(0.5);
+        doc.line(40, 30, 555, 30);
+        doc.line(40, 810, 555, 810);
+      }
+      
+      // File Name Formatting
+      const categorySanitized = (activeReport.interviewType || activeReport.category || config.category || "Interview").trim().replace(/[^a-zA-Z0-9]/g, "_");
+      const dateObj = activeReport.completedAt ? new Date(activeReport.completedAt) : new Date();
+      const yyyy = dateObj.getFullYear();
+      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(dateObj.getDate()).padStart(2, '0');
+      const formattedDate = `${yyyy}-${mm}-${dd}`;
+      const filename = `PrepSphere_Interview_Report_${categorySanitized}_${formattedDate}.pdf`;
+      
+      doc.save(filename);
       setDownloadMessage("Report downloaded successfully.");
       setTimeout(() => setDownloadMessage(""), 4000);
     } catch (error) {
@@ -971,18 +1358,7 @@ const MockInterview = () => {
                     className="space-y-8 text-left"
                   >
                     {/* Header */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div>
-                        <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-2">
-                          <MessageSquareCode className="w-8 h-8 text-indigo-400" />
-                          AI Mock Interview
-                        </h1>
-                        <p className="text-sm text-slate-400 mt-1">Practice realistic AI-powered technical and HR interviews to prepare for placements.</p>
-                      </div>
-                      <div className="flex gap-2.5">
-                      </div>
-                    </div>
-
+                    
                     {/* Hero Card */}
                     <div className="bg-slate-950/20 border border-white/10 rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
                       <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
@@ -1014,16 +1390,7 @@ const MockInterview = () => {
                         </div>
                       </div>
 
-                      {/* Right AI Vector Illustration (Pure Visual UI element) */}
-                      <div className="relative w-48 h-48 sm:w-56 sm:h-56 hidden md:flex items-center justify-center shrink-0">
-                        <div className="absolute inset-0 rounded-full bg-indigo-500/5 border border-indigo-500/10 animate-pulse" />
-                        <div className="absolute inset-4 rounded-full bg-purple-500/5 border border-dashed border-purple-500/20 animate-spin [animation-duration:20s]" />
-                        <div className="absolute inset-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 p-[1.5px] rotate-12 shadow-lg shadow-indigo-500/10">
-                          <div className="w-full h-full rounded-2xl bg-[#080E24] flex items-center justify-center">
-                            <MessageSquareCode className="w-12 h-12 text-indigo-400 animate-pulse" />
-                          </div>
-                        </div>
-                      </div>
+                      
                     </div>
 
                     {/* Quick Statistics (4 cards) */}

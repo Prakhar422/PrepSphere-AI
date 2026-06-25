@@ -1,13 +1,15 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
 const isRetryableError = (error) => {
-  const message = error.message || '';
-  const status = error.status || error.statusCode;
+  const status = error.status || error.statusCode || error.headers?.get?.('status');
+  if (status === 401 || status === 403 || status === 400) return false;
   if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) return true;
+  
+  const message = error.message || '';
   const retryableStrings = [
-    '429', 'RESOURCE_EXHAUSTED', '500', 'Internal Server Error', '502', 'Bad Gateway', '503', 'Service Unavailable',
+    '500', 'Internal Server Error', '502', 'Bad Gateway', '503', 'Service Unavailable',
     '504', 'Gateway Timeout', 'experiencing high demand', 'overloaded', 'rate limit',
-    'quota exceeded', 'socket hang up', 'ECONNRESET', 'ETIMEDOUT'
+    'quota exceeded', 'socket hang up', 'ECONNRESET', 'ETIMEDOUT', 'timeout'
   ];
   return retryableStrings.some(str => message.toLowerCase().includes(str.toLowerCase()));
 };
@@ -30,19 +32,97 @@ const retryWithBackoff = async (fn, maxAttempts = 3, delaySequence = [0, 2000, 4
     try {
       return await fn(attempt);
     } catch (error) {
-      const isRetryable = isRetryableError(error);
-      if (!isRetryable || attempt >= maxAttempts) {
+      const isRetry = isRetryableError(error);
+      if (!isRetry || attempt >= maxAttempts) {
         throw error;
       }
       const delay = delaySequence[attempt];
-      console.warn(`[GEMINI INTERVIEW] Attempt ${attempt} failed: ${error.message || error}. Retrying in ${delay}ms...`);
+      console.warn(`[GROQ INTERVIEW] Attempt ${attempt} failed: ${error.message || error}. Retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 };
 
+const executeGroqCompletion = async (prompt, maxTokens = 2048, temperature = 0.7) => {
+  const apiKey = process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY;
+  if (!apiKey) {
+    const err = new Error('GROQ_API_KEY or VITE_GROQ_API_KEY is not defined in the environment variables');
+    err.status = 401;
+    throw err;
+  }
+
+  const groq = new Groq({ apiKey });
+
+  const apiCall = async () => {
+    return await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      model: 'llama-3.3-70b-versatile',
+      response_format: { type: 'json_object' },
+      temperature,
+      max_tokens: maxTokens
+    }, {
+      timeout: 30000 // 30 seconds timeout
+    });
+  };
+
+  try {
+    const completion = await retryWithBackoff(apiCall);
+    if (!completion || !completion.choices || completion.choices.length === 0) {
+      const err = new Error('Empty response choices from Groq API.');
+      err.status = 502;
+      throw err;
+    }
+    
+    const content = completion.choices[0]?.message?.content;
+    if (!content || !content.trim()) {
+      const err = new Error('Groq API returned an empty completion content.');
+      err.status = 502;
+      throw err;
+    }
+
+    const usage = completion.usage || {};
+    const promptTokens = usage.prompt_tokens || 0;
+    const completionTokens = usage.completion_tokens || 0;
+    const totalTokens = usage.total_tokens || 0;
+
+    return {
+      content,
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens
+      }
+    };
+  } catch (error) {
+    const status = error.status || error.statusCode;
+    
+    if (status === 401) {
+      const authErr = new Error('Invalid Groq API key configured. Please verify your credentials.');
+      authErr.status = 401;
+      throw authErr;
+    } else if (status === 429) {
+      const rateLimitErr = new Error('Groq API rate limit exceeded. Please try again in a few moments.');
+      rateLimitErr.status = 429;
+      throw rateLimitErr;
+    } else if (error.name === 'APIConnectionTimeoutError' || error.message?.toLowerCase().includes('timeout') || error.message?.toLowerCase().includes('abort')) {
+      const timeoutErr = new Error('Groq API request timed out. Please try again.');
+      timeoutErr.status = 408;
+      throw timeoutErr;
+    } else {
+      const generalErr = new Error(error.message || 'Groq API request failed.');
+      generalErr.status = status || 502;
+      throw generalErr;
+    }
+  }
+};
+
 /**
- * Generates the first interview question using the Gemini model.
+ * Generates the first interview question using the Groq model.
  * 
  * @param {Object} params - Config attributes
  * @returns {Promise<Object>} Object containing the question text and token usage metadata
@@ -55,28 +135,6 @@ export const generateFirstQuestion = async ({
   language,
   resumeContext
 }) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not defined in the environment variables');
-  }
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'object',
-        properties: {
-          question: { type: 'string' }
-        },
-        required: ['question']
-      },
-      temperature: 0.7,
-      maxOutputTokens: 1000
-    }
-  });
-
   const systemPrompt = `You are a professional, senior corporate interviewer conducting a mock placement interview.
 Your role is to simulate a realistic interview experience.
 Generate ONLY the very first question of the mock interview. Do not ask multiple questions. Do not evaluate any answers. Do not provide feedback.
@@ -104,43 +162,22 @@ Intelligent Coverage Rules:
 ${resumeContext ? `Candidate Resume Context:
 ${resumeContext}` : ''}`;
 
-  console.log(`[GEMINI INTERVIEW] Requesting first question for Type: ${interviewType}, Role: ${role}, Company: ${company}`);
+  console.log(`[GROQ INTERVIEW] Requesting first question for Type: ${interviewType}, Role: ${role}, Company: ${company}`);
 
-  const result = await retryWithBackoff(async (attempt) => {
-    return await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: systemPrompt }]
-        }
-      ]
-    });
-  });
-
-  const rawText = result.response.text();
-  const cleaned = cleanJsonResponseText(rawText);
+  const { content, usage } = await executeGroqCompletion(systemPrompt, 1000, 0.7);
+  const cleaned = cleanJsonResponseText(content);
   const parsed = JSON.parse(cleaned);
 
   if (!parsed || typeof parsed !== 'object' || typeof parsed.question !== 'string' || !parsed.question.trim()) {
-    throw new Error('Gemini response JSON does not contain a valid question.');
+    throw new Error('Groq response JSON does not contain a valid question.');
   }
 
   const question = parsed.question.trim();
 
-  // Get token usage metadata from the response
-  const usage = result.response.usageMetadata || {};
-  const promptTokens = usage.promptTokenCount || 0;
-  const completionTokens = usage.candidatesTokenCount || 0;
-  const totalTokens = usage.totalTokenCount || 0;
-
   return {
     question,
-    usage: {
-      promptTokens,
-      completionTokens,
-      totalTokens
-    },
-    modelUsed: 'gemini-2.5-flash'
+    usage,
+    modelUsed: 'llama-3.3-70b-versatile'
   };
 };
 
@@ -163,39 +200,6 @@ export const evaluateInterviewAnswer = async ({
   currentQuestionNumber,
   totalQuestions
 }) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not defined in the environment variables');
-  }
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'object',
-        properties: {
-          evaluation: {
-            type: 'object',
-            properties: {
-              score: { type: 'number' },
-              strengths: { type: 'array', items: { type: 'string' } },
-              weaknesses: { type: 'array', items: { type: 'string' } },
-              suggestions: { type: 'array', items: { type: 'string' } },
-              idealAnswer: { type: 'string' }
-            },
-            required: ['score', 'strengths', 'weaknesses', 'suggestions', 'idealAnswer']
-          },
-          nextQuestion: { type: 'string' }
-        },
-        required: ['evaluation', 'nextQuestion']
-      },
-      temperature: 0.7,
-      maxOutputTokens: 2048
-    }
-  });
-
   const historyText = previousConversation && previousConversation.length > 0
     ? previousConversation
     : 'No previous conversation history.';
@@ -256,25 +260,19 @@ Next Question Generation:
   - If language is Mixed, use a professional blend of English and Hindi (Hinglish). If language is Hindi, use Hindi. If English, use English.
 
 Response Format:
-You must return a JSON object conforming exactly to the response schema requested. Do not wrap in markdown or provide extra text.`;
+You must return a JSON object conforming exactly to the response schema:
+{
+  "evaluation": {
+    "score": number,
+    "strengths": ["string", ...],
+    "weaknesses": ["string", ...],
+    "suggestions": ["string", ...],
+    "idealAnswer": "string"
+  },
+  "nextQuestion": "string"
+}
+Do not wrap in markdown or provide extra text.`;
 
-  const runApiCall = async () => {
-    return await retryWithBackoff(async (attempt) => {
-      console.log(`[GEMINI INTERVIEW] Evaluating answer, Attempt: ${attempt}`);
-      const response = await model.generateContent({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }]
-          }
-        ]
-      });
-      return response;
-    });
-  };
-
-  let result;
-  let parsed;
   let attemptCount = 0;
   let rawText = '';
   
@@ -282,10 +280,11 @@ You must return a JSON object conforming exactly to the response schema requeste
     attemptCount++;
     const startTime = Date.now();
     try {
-      result = await runApiCall();
-      rawText = result.response.text();
+      console.log(`[GROQ INTERVIEW] Evaluating answer, Attempt: ${attemptCount}`);
+      const { content, usage } = await executeGroqCompletion(prompt, 2048, 0.7);
+      rawText = content;
       const cleaned = cleanJsonResponseText(rawText);
-      parsed = JSON.parse(cleaned);
+      const parsed = JSON.parse(cleaned);
 
       // JSON Validation check
       const score = parsed.evaluation?.score;
@@ -317,27 +316,22 @@ You must return a JSON object conforming exactly to the response schema requeste
         (isFinal ? nextQuestion === '' : nextQuestion.trim() !== '');
 
       if (!isValid) {
-        throw new Error('Gemini response JSON does not conform to the expected schema or validation constraints.');
+        throw new Error('Groq response JSON does not conform to the expected schema or validation constraints.');
       }
       
-      const usage = result.response.usageMetadata || {};
-      parsed.usage = {
-        promptTokens: usage.promptTokenCount || 0,
-        completionTokens: usage.candidatesTokenCount || 0,
-        totalTokens: usage.totalTokenCount || 0
-      };
+      parsed.usage = usage;
       parsed.responseTime = Date.now() - startTime;
       
       return parsed;
     } catch (err) {
-      console.error(`[GEMINI INTERVIEW EVALUATION] Attempt ${attemptCount} failed parsing/validating JSON:`, err.message);
-      console.error('RAW GEMINI RESPONSE WAS:', rawText);
+      console.error(`[GROQ INTERVIEW EVALUATION] Attempt ${attemptCount} failed parsing/validating JSON:`, err.message);
+      console.error('RAW GROQ RESPONSE WAS:', rawText);
       if (attemptCount >= 2) {
-        const customErr = new Error('AI returned an invalid response.');
-        customErr.status = 502;
+        const customErr = new Error(err.message || 'AI returned an invalid response.');
+        customErr.status = err.status || 502;
         throw customErr;
       }
-      console.warn(`[GEMINI INTERVIEW EVALUATION] Malformed response, retrying JSON validation once...`);
+      console.warn(`[GROQ INTERVIEW EVALUATION] Malformed response, retrying JSON validation once...`);
     }
   }
 };
@@ -347,7 +341,7 @@ You must return a JSON object conforming exactly to the response schema requeste
  * placement readiness, and personalized career recommendations.
  * 
  * @param {Object} params - Dialogue data and user details
- * @returns {Promise<Object>} The compiled final report components from Gemini
+ * @returns {Promise<Object>} The compiled final report components from Groq
  */
 export const generateInterviewReport = async ({
   interviewType,
@@ -358,34 +352,6 @@ export const generateInterviewReport = async ({
   conversationHistory,
   overallScore
 }) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not defined in the environment variables');
-  }
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'object',
-        properties: {
-          overallFeedback: { type: 'string' },
-          strengths: { type: 'array', items: { type: 'string' } },
-          weaknesses: { type: 'array', items: { type: 'string' } },
-          recommendations: { type: 'array', items: { type: 'string' } },
-          placementReadiness: { type: 'string' },
-          careerAdvice: { type: 'string' }
-        },
-        required: ['overallFeedback', 'strengths', 'weaknesses', 'recommendations', 'placementReadiness', 'careerAdvice']
-      },
-      temperature: 0.7,
-      maxOutputTokens: 2048
-    }
-  });
-
-  // Format the full interview history for analysis
   const historyText = conversationHistory
     .map((q, idx) => {
       const evalText = q.evaluation
@@ -435,20 +401,9 @@ You must return a JSON object conforming exactly to the schema:
 Strictly follow these rules:
 - Return ONLY the JSON object. No explanation, no markdown wraps.`;
 
-  console.log(`[GEMINI REPORT] Requesting final placement summary for Session. Overall Score: ${overallScore}%`);
+  console.log(`[GROQ REPORT] Requesting final placement summary for Session. Overall Score: ${overallScore}%`);
 
-  const result = await retryWithBackoff(async (attempt) => {
-    return await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: prompt }]
-        }
-      ]
-    });
-  });
-
-  const rawText = result.response.text();
-  const cleaned = cleanJsonResponseText(rawText);
+  const { content } = await executeGroqCompletion(prompt, 2048, 0.7);
+  const cleaned = cleanJsonResponseText(content);
   return JSON.parse(cleaned);
 };

@@ -11,8 +11,8 @@ This template is used by the `create-node-fast-server` CLI when the user selects
 ## Environment Variables
 
 Ensure you have a `.env` file in this directory with the following variables:
-- `GROQ_API_KEY`: Required to power the Coding Journey AI Question Generator and AI Code Reviewer. Get a key from the Groq console.
-- `GEMINI_API_KEY`: Required for interview prep and resume analysis modules.
+- `GROQ_API_KEY`: Required to power the Coding Journey AI Question Generator, AI Code Reviewer, and Mock Interview Prep modules. Get a key from the Groq console.
+- `GEMINI_API_KEY`: Required for the aptitude quiz and resume analysis modules.
 - `MONGO_URI`: MongoDB connection string.
 - `JWT_SECRET`: Security token signature secret.
 

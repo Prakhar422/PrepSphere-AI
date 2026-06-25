@@ -80,12 +80,20 @@ const Dashboard = () => {
     isEmpty: false,
     error: null
   });
+  const [codingSummary, setCodingSummary] = useState({
+    codingScore: 0,
+    solvedCount: 0,
+    loading: true
+  });
+  const [dsaProblem, setDsaProblem] = useState({
+    problem: null,
+    loading: true
+  });
 
   // Community and saved experiences states
   const [savedExperiences, setSavedExperiences] = useState([]);
   const [totalLikesGiven, setTotalLikesGiven] = useState(0);
   const [totalBookmarkedExperiences, setTotalBookmarkedExperiences] = useState(0);
-  const [totalComments, setTotalComments] = useState(0);
   const [loadingExperiences, setLoadingExperiences] = useState(true);
   const [unbookmarkingId, setUnbookmarkingId] = useState(null);
 
@@ -143,11 +151,21 @@ const Dashboard = () => {
             loading: false
           });
 
+          setCodingSummary({
+            codingScore: response.data.codingScore || 0,
+            solvedCount: response.data.codingQuestionsSolved || response.data.codingSummary?.totalSolved || 0,
+            loading: false
+          });
+
+          setDsaProblem({
+            problem: response.data.dsaProblemOfTheDay || null,
+            loading: false
+          });
+
           setReadinessVal(response.data.readiness || 0);
           setActivitiesList(response.data.activities || []);
           setTotalLikesGiven(response.data.totalLikesGiven || 0);
           setTotalBookmarkedExperiences(response.data.totalBookmarkedExperiences || 0);
-          setTotalComments(response.data.totalComments || 0);
           setSavedExperiences(response.data.savedExperiences || []);
         }
       } catch (err) {
@@ -158,6 +176,15 @@ const Dashboard = () => {
           loading: false,
           error: "Failed to load aptitude summary."
         }));
+        setCodingSummary({
+          codingScore: 0,
+          solvedCount: 0,
+          loading: false
+        });
+        setDsaProblem({
+          problem: null,
+          loading: false
+        });
       } finally {
         setLoadingExperiences(false);
       }
@@ -231,7 +258,9 @@ const Dashboard = () => {
     Award: Award,
     Clock: Clock,
     MessageSquareCode: MessageSquareCode,
-    Briefcase: Briefcase
+    Briefcase: Briefcase,
+    TrendingUp: TrendingUp,
+    Code2: Code2
   };
 
   // Contest Mock Data
@@ -464,7 +493,7 @@ const Dashboard = () => {
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
                   <span className="text-lg font-semibold text-slate-300">
-                    Average Interview Score
+                    Interview Score
                   </span>
                   <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
                     <MessageSquareCode className="w-4 h-4" />
@@ -489,21 +518,21 @@ const Dashboard = () => {
                 )}
               </motion.div>
 
-              {/* Card 4: Highest Interview Score */}
+              {/* Card 4: Coding Score */}
               <motion.div
                 variants={itemVariants}
-                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all duration-300"
+                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all duration-300"
               >
-                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
+                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
                   <span className="text-lg font-semibold text-slate-300">
-                    Highest Interview Score
+                    Coding Score
                   </span>
-                  <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
-                    <Award className="w-4 h-4" />
+                  <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                    <Code2 className="w-4 h-4" />
                   </div>
                 </div>
-                {interviewSummary.loading ? (
+                {codingSummary.loading ? (
                   <div className="space-y-3 mt-4">
                     <Skeleton className="h-8 w-20" />
                     <Skeleton className="h-4 w-40" />
@@ -511,12 +540,12 @@ const Dashboard = () => {
                 ) : (
                   <>
                     <div className="mt-4 flex items-baseline space-x-1.5">
-                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                        {interviewSummary.hasInterviews ? `${interviewSummary.highestScore}%` : "--"}
+                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
+                        {codingSummary.codingScore}%
                       </span>
                     </div>
                     <div className="mt-2 text-sm text-slate-400 font-medium flex items-center gap-1">
-                      <span>Best performance metric</span>
+                      <span>Problems Solved: {codingSummary.solvedCount}</span>
                     </div>
                   </>
                 )}
@@ -528,7 +557,7 @@ const Dashboard = () => {
               variants={containerVariants}
               initial="hidden"
               animate="show"
-              className="grid grid-cols-1 sm:grid-cols-3 gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-6"
             >
               {/* Card 1: Saved Experiences */}
               <motion.div
@@ -589,38 +618,6 @@ const Dashboard = () => {
                     </div>
                     <div className="mt-1 text-xs text-slate-400 font-light">
                       Community feedback contributions
-                    </div>
-                  </>
-                )}
-              </motion.div>
-
-              {/* Card 3: Comments Posted */}
-              <motion.div
-                variants={itemVariants}
-                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all duration-300"
-              >
-                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
-                <div className="flex justify-between items-start">
-                  <span className="text-sm font-semibold text-slate-400">
-                    Total Comments
-                  </span>
-                  <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
-                    <MessageSquare className="w-4 h-4" />
-                  </div>
-                </div>
-                {loadingExperiences ? (
-                  <div className="space-y-3 mt-4">
-                    <Skeleton className="h-8 w-20" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="mt-4 flex items-baseline space-x-1.5">
-                      <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                        {totalComments}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-xs text-slate-400 font-light">
-                      Discussion and questions posted
                     </div>
                   </>
                 )}
@@ -800,7 +797,7 @@ const Dashboard = () => {
                         className="text-transparent"
                         strokeWidth="6"
                         strokeDasharray={289}
-                        strokeDashoffset={289 - (289 * (resumeSummary.loading || aptitudeSummary.loading ? 0 : readinessVal)) / 100}
+                        strokeDashoffset={289 - (289 * (resumeSummary.loading || aptitudeSummary.loading || codingSummary.loading ? 0 : readinessVal)) / 100}
                         strokeLinecap="round"
                         stroke="url(#readiness-gradient)"
                         fill="transparent"
@@ -821,7 +818,7 @@ const Dashboard = () => {
                     </svg>
                     <div className="absolute text-center">
                       <span className="text-2xl font-black text-white">
-                        {resumeSummary.loading || aptitudeSummary.loading ? "..." : `${readinessVal}%`}
+                        {resumeSummary.loading || aptitudeSummary.loading || codingSummary.loading ? "..." : `${readinessVal}%`}
                       </span>
                       <span className="block text-[10px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">
                         READY
@@ -878,15 +875,15 @@ const Dashboard = () => {
 
                     <div>
                       <div className="flex justify-between text-slate-400 text-sm mb-1">
-                        <span>Communication</span>
+                        <span>Coding Score</span>
                         <span className="font-bold text-slate-300">
-                          {interviewSummary.loading ? "..." : (interviewSummary.hasInterviews ? `${interviewSummary.latestInterview?.communicationScore || 0}%` : "0%")}
+                          {codingSummary.loading ? "..." : `${codingSummary.codingScore}%`}
                         </span>
                       </div>
                       <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-cyan-500 transition-all duration-500" 
-                          style={{ width: `${interviewSummary.loading ? 0 : (interviewSummary.hasInterviews ? (interviewSummary.latestInterview?.communicationScore || 0) : 0)}%` }}
+                          style={{ width: `${codingSummary.loading ? 0 : codingSummary.codingScore}%` }}
                         />
                       </div>
                     </div>
@@ -899,10 +896,10 @@ const Dashboard = () => {
               </div>
             </section>
 
-            {/* RESUME ANALYSIS & CODING CONTESTS GRID */}
+            {/* RESUME ANALYSIS GRID */}
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {/* Card 1: AI Resume Analysis */}
-              <div className="lg:col-span-6 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
+              <div className="lg:col-span-12 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
 
                 <div className="space-y-4 flex-1">
@@ -936,7 +933,7 @@ const Dashboard = () => {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
                       {/* Strengths */}
                       <div>
                         <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">
@@ -946,7 +943,7 @@ const Dashboard = () => {
                           {resumeSummary.strengths?.length > 0 ? (
                             resumeSummary.strengths.slice(0, 3).map((strength, idx) => (
                               <span key={idx} className="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold">
-                                {strength}
+                                  {strength}
                               </span>
                             ))
                           ) : (
@@ -962,9 +959,9 @@ const Dashboard = () => {
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {resumeSummary.missingKeywords?.length > 0 ? (
-                            resumeSummary.missingKeywords.slice(0, 3).map((keyword, idx) => (
+                            resumeSummary.missingKeywords.slice(0, 5).map((keyword, idx) => (
                               <span key={idx} className="text-xs bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-0.5 rounded-full font-bold">
-                                {keyword}
+                                  {keyword}
                               </span>
                             ))
                           ) : (
@@ -976,7 +973,7 @@ const Dashboard = () => {
                   )}
                 </div>
 
-                <div className="pt-6 border-t border-white/5 mt-4">
+                <div className="pt-6 border-t border-white/5 mt-6">
                   <button 
                     onClick={() => navigate("/resume-analyzer")}
                     className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] hover:border-white/15 text-sm font-medium text-slate-200 transition-colors cursor-pointer"
@@ -984,51 +981,6 @@ const Dashboard = () => {
                     <Upload className="w-3.5 h-3.5 text-indigo-400" />
                     Upload New Resume
                   </button>
-                </div>
-              </div>
-
-              {/* Card 2: Upcoming Coding Contests */}
-              <div className="lg:col-span-6 bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
-                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-
-                <div>
-                  <div className="flex justify-between items-center pb-3 border-b border-white/5 mb-4">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                      <Code2 className="w-4 h-4 text-cyan-400" />
-                      Upcoming Coding Contests
-                    </h3>
-                  </div>
-
-                  <div className="space-y-3">
-                    {contests.map((contest, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between items-center p-3 rounded-xl bg-slate-950/30 border border-white/5 hover:border-white/10 transition-colors"
-                      >
-                        <div>
-                          <h4 className="text-sm font-semibold text-white">
-                            {contest.name}
-                          </h4>
-                          <span className="text-sm text-slate-400 font-light flex items-center gap-1 mt-0.5">
-                            <Clock className="w-3 h-3 text-cyan-400/75" />
-                            {contest.date} | {contest.time}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => toggleReminder(contest.key)}
-                          className={`text-sm font-medium px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer ${
-                            reminders[contest.key]
-                              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                              : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white hover:border-white/25"
-                          }`}
-                        >
-                          {reminders[contest.key]
-                            ? "✓ REMIND SET"
-                            : "SET REMINDER"}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
             </section>
@@ -1120,33 +1072,80 @@ const Dashboard = () => {
               <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-6 relative overflow-hidden text-left flex flex-col justify-between shadow-lg">
                 <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-purple-500/30 to-transparent pointer-events-none" />
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-2.5 border-b border-white/5">
-                    <span className="text-xs font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                      DSA Problem of the Day
-                    </span>
-                    <span className="text-xs text-slate-400 font-medium">
-                      Difficulty: Hard
-                    </span>
+                {dsaProblem.loading ? (
+                  <div className="space-y-4 flex-1">
+                    <div className="flex justify-between items-center pb-2.5 border-b border-white/5">
+                      <Skeleton className="h-4 w-1/4" />
+                      <Skeleton className="h-4 w-1/6" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
                   </div>
+                ) : !dsaProblem.problem ? (
+                  <div className="flex-grow flex flex-col justify-center items-center py-6 text-center">
+                    <Code2 className="w-10 h-10 text-purple-500/30 mb-3 animate-pulse" />
+                    <h4 className="text-sm font-semibold text-white">No problem available today.</h4>
+                    <p className="text-xs text-slate-400 mt-1">Check back tomorrow.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-center pb-2.5 border-b border-white/5">
+                        <span className="text-xs font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                          DSA Problem of the Day
+                        </span>
+                        <span className="text-xs text-slate-400 font-medium">
+                          Difficulty: {dsaProblem.problem.difficulty}
+                        </span>
+                      </div>
 
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-semibold text-white">
-                      Reverse Nodes in k-Group
-                    </h4>
-                    <span className="block text-xs text-slate-400 uppercase tracking-widest font-mono font-medium">
-                      Linked Lists | Pointer manipulation
-                    </span>
-                    <p className="text-sm text-slate-300 font-light leading-relaxed">
-                      Given the head of a linked list, reverse the nodes of the
-                      list k at a time, and return its modified head.
-                    </p>
+                      <div className="space-y-2 mt-3">
+                        <h4 className="text-lg font-semibold text-white">
+                          {dsaProblem.problem.title}
+                        </h4>
+                        
+                        <div className="flex flex-wrap gap-1.5 my-1.5">
+                          {/* Topic Tag */}
+                          <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded font-mono uppercase">
+                            {dsaProblem.problem.topic}
+                          </span>
+                          
+                          {/* Company Tag */}
+                          <span className="text-[10px] font-bold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded font-mono uppercase">
+                            {dsaProblem.problem.company}
+                          </span>
+                          
+                          {/* Other Tags */}
+                          {(dsaProblem.problem.tags || []).slice(0, 2).map((tag, idx) => (
+                            <span key={idx} className="text-[10px] font-medium text-slate-400 bg-white/5 px-2 py-0.5 rounded font-mono">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+
+                        <p className="text-xs text-slate-300 font-light leading-relaxed line-clamp-3">
+                          {dsaProblem.problem.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-3">
+                      <Clock className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Estimated Time: {dsaProblem.problem.estimatedTime}</span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="pt-6 border-t border-white/5 mt-4">
-                  <button className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-indigo-500/10 border border-purple-500/20 hover:border-purple-500/40 hover:bg-purple-500/20 text-sm font-medium text-purple-300 rounded-xl transition-all duration-200 cursor-pointer">
-                    Start Coding
+                  <button 
+                    onClick={() => navigate("/coding-journey")}
+                    disabled={dsaProblem.loading || !dsaProblem.problem}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-indigo-500/10 border border-purple-500/20 hover:border-purple-500/40 hover:bg-purple-500/20 disabled:opacity-50 disabled:pointer-events-none text-sm font-medium text-purple-300 rounded-xl transition-all duration-200 cursor-pointer"
+                  >
+                    Start Solving
                   </button>
                 </div>
               </div>
