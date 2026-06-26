@@ -95,15 +95,15 @@ Make sure you have [Node.js](https://nodejs.org/) (v16 or higher) and [npm](http
 
 ### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/Prakhar422/Placement-Preparation.git
-cd Placement-Preparation
+git clone https://github.com/Prakhar422/PrepSphere-AI.git
+cd PrepSphere-AI
 ```
 
 ---
 
 ## 🔌 Environment Variables
 
-You must set up `.env` files in both the `Backend/` directories.
+You must set up `.env` files in the `Backend/` directories.
 
 
 
