@@ -190,7 +190,7 @@ npm run dev
 - **College**: Jabalpur Engineering College
 - **Degree**: B.Tech Information Technology (Class of 2026)
 - **GitHub**: [github.com/Prakhar422](https://github.com/Prakhar422) 
-- **LinkedIn**: [linkedin.com/in/prakhar-garg](www.linkedin.com/in/prakhar-garg-60a7a8256) 
+- **LinkedIn**: [linkedin.com/in/prakhar-garg](https://www.linkedin.com/in/prakhar-garg-60a7a8256/) 
 
 ---
 
