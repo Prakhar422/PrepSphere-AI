@@ -12,6 +12,13 @@ This directory contains the REST API server codebase of the **PrepSphere AI** ap
 
 ---
 
+## 🔧 API URL
+
+**Backend API:**
+https://prepsphere-ai-backend.onrender.com
+
+---
+
 ## 🏗️ Backend Architecture
 
 The server adheres to a modular MVC (Model-View-Controller) structure representing clean database-logic division:

@@ -12,6 +12,13 @@ This directory contains the Frontend user interface codebase of the **PrepSphere
 
 ---
 
+## 🚀 Live Demo
+
+**Frontend URL:**
+https://prep-sphere-ai.vercel.app
+
+---
+
 ## 🏗️ Architecture Overview
 
 The frontend follows a modern, component-driven modular structure:

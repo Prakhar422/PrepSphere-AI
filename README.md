@@ -14,6 +14,13 @@ An AI-powered placement preparation platform designed to help students master co
 
 ---
 
+## 🌐 Live Demo
+
+- 🚀 **Frontend:** https://prep-sphere-ai.vercel.app
+- 🔧 **Backend API:** https://prepsphere-ai-backend.onrender.com
+
+---
+
 ## 📌 Project Overview
 
 **PrepSphere AI** is a comprehensive, full-stack web application designed for students preparing for placements. It bridges the gap between learning and evaluation by offering features like an automated ATS resume score scanner, real-time AI mock interviews, custom-generated aptitude quizzes, coding analytics tracking, and a collaborative hub for sharing interview experiences.
