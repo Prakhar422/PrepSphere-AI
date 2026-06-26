@@ -64,7 +64,14 @@ const CustomXAxisTick = ({ x, y, payload }) => {
   if (!payload || !payload.value) return null;
   const words = payload.value.split(" ");
   return (
-    <text x={x} y={y + 10} textAnchor="middle" fill="#64748b" fontSize={9} className="font-sans font-medium">
+    <text
+      x={x}
+      y={y + 6}
+      textAnchor="middle"
+      fill="#64748b"
+      className="font-sans font-medium text-[10px] sm:text-[12px]"
+      style={{ lineHeight: "1.2", textAlign: "center" }}
+    >
       {words.map((word, index) => (
         <tspan key={index} x={x} dy={index === 0 ? 0 : "1.2em"}>
           {word}
@@ -212,7 +219,7 @@ const AnalyticsTab = ({ data, dashboardData, loading }) => {
     return pieDifficultyData.reduce((acc, curr) => acc + curr.value, 0);
   }, [pieDifficultyData]);
 
-  // Prep Category Distribution for exactly 10 target categories
+  // Prep Category Distribution for exactly 8 target categories
   const barCategoryData = useMemo(() => {
     const rawDist = data.categoryDistribution || [];
     const categoriesOrder = [
@@ -223,9 +230,7 @@ const AnalyticsTab = ({ data, dashboardData, loading }) => {
       "Graphs",
       "Dynamic Programming",
       "Binary Search",
-      "Sliding Window",
-      "Heap",
-      "Greedy"
+      "Sliding Window"
     ];
 
     const counts = {
@@ -236,9 +241,7 @@ const AnalyticsTab = ({ data, dashboardData, loading }) => {
       "Graphs": 0,
       "Dynamic Programming": 0,
       "Binary Search": 0,
-      "Sliding Window": 0,
-      "Heap": 0,
-      "Greedy": 0
+      "Sliding Window": 0
     };
 
     rawDist.forEach(item => {
@@ -377,81 +380,83 @@ const AnalyticsTab = ({ data, dashboardData, loading }) => {
       </div>
 
       {/* 2. CHARTS SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[0.8fr_1.5fr] gap-8">
         {/* Left Chart: Solved by Difficulty */}
-        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg space-y-4 flex flex-col justify-between">
+        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-4 relative overflow-hidden shadow-lg h-[310px] flex flex-col justify-between">
           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent pointer-events-none" />
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
             Problems Solved by Difficulty
           </h3>
 
           {totalSolvedDifficulty > 0 ? (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 py-4">
-              <div className="h-[150px] w-[150px] shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip
-                      contentStyle={{
-                        background: "#080e24",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        borderRadius: "12px"
-                      }}
-                    />
-                    <Pie
-                      data={pieDifficultyData.filter(d => d.value > 0)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={60}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {pieDifficultyData.map((entry, idx) => (
-                        <Cell key={`cell-${idx}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              
-              <div className="flex-1 space-y-2 text-xs text-slate-300 w-full">
-                {pieDifficultyData.map((item, idx) => {
-                  const pct = totalSolvedDifficulty > 0 ? Math.round((item.value / totalSolvedDifficulty) * 100) : 0;
-                  return (
-                    <div key={idx} className="flex items-center justify-between border-b border-white/5 pb-1">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className="font-semibold text-slate-300">{item.name}</span>
+            <div className="flex-1 flex items-center justify-center" style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "24px", width: "100%" }}>
+                <div className="h-[140px] w-[140px] shrink-0 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip
+                        contentStyle={{
+                          background: "#080e24",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          borderRadius: "12px"
+                        }}
+                      />
+                      <Pie
+                        data={pieDifficultyData.filter(d => d.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={70}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {pieDifficultyData.map((entry, idx) => (
+                          <Cell key={`cell-${idx}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="flex-1 space-y-1.5 text-xs text-slate-300 max-w-[160px]">
+                  {pieDifficultyData.map((item, idx) => {
+                    const pct = totalSolvedDifficulty > 0 ? Math.round((item.value / totalSolvedDifficulty) * 100) : 0;
+                    return (
+                      <div key={idx} className="flex items-center justify-between border-b border-white/5 pb-1">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="font-semibold text-slate-300">{item.name}</span>
+                        </div>
+                        <span className="font-mono font-bold text-white ml-2">
+                          {item.value} ({pct}%)
+                        </span>
                       </div>
-                      <span className="font-mono font-bold text-white">
-                        {item.value} ({pct}%)
-                      </span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           ) : (
-            <div className="h-[200px] flex items-center justify-center text-slate-500 text-xs italic text-center w-full">
+            <div className="flex-1 flex items-center justify-center text-slate-500 text-xs italic text-center w-full">
               No problems solved yet.
             </div>
           )}
         </div>
 
         {/* Right Chart: Solved by Category */}
-        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-lg space-y-4">
+        <div className="bg-slate-950/40 border border-white/10 rounded-3xl p-4 relative overflow-hidden shadow-lg h-[310px] flex flex-col justify-between">
           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent pointer-events-none" />
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
             Problems Solved by Category
           </h3>
           
-          <div className="w-full overflow-x-auto pb-2 scrollbar-thin">
-            <div style={{ minWidth: `${Math.max(barCategoryData.length * 70, 560)}px`, height: "250px" }}>
+          <div className="w-full pb-2 flex-1 flex items-end">
+            <div style={{ width: "100%", height: "230px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={barCategoryData}
-                  margin={{ top: 10, right: 10, left: -25, bottom: 20 }}
-                  barCategoryGap="10%"
+                  margin={{ top: 15, right: 10, left: -20, bottom: 40 }}
+                  barCategoryGap="15%"
                   barGap={2}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -461,8 +466,9 @@ const AnalyticsTab = ({ data, dashboardData, loading }) => {
                     interval={0}
                     stroke="#64748b"
                     tickLine={false}
-                    height={50}
-                    tickMargin={12}
+                    height={40}
+                    tickMargin={6}
+                    padding={{ left: 20, right: 20 }}
                   />
                   <YAxis
                     type="number"
@@ -484,8 +490,7 @@ const AnalyticsTab = ({ data, dashboardData, loading }) => {
                   <Bar
                     dataKey="count"
                     radius={[8, 8, 0, 0]}
-                    barSize={40}
-                    maxBarSize={50}
+                    barSize={45}
                   >
                     {barCategoryData.map((entry, idx) => (
                       <Cell key={`cell-${idx}`} fill={entry.fill} />
