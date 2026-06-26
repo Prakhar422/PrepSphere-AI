@@ -908,7 +908,7 @@ const InterviewExperiences = () => {
                 </div>
                 
                 <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white font-inter">
-                  Interview Experiences
+                  Learn From Real Interview Experiences
                 </h1>
                 <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-light">
                   Learn from real interview experiences shared by students and professionals from top companies. Master coding strategies and structural processes.

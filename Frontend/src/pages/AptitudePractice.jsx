@@ -701,7 +701,7 @@ const AptitudePractice = () => {
                         <span>Practice &amp; Cognitive Metrics</span>
                       </div>
                       <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                        Welcome Back, {user?.name || "PrepSphere User"}
+                        Master Your Aptitude Skills
                       </h1>
                       <p className="text-sm text-slate-300 leading-relaxed font-light">
                         Continue sharpening your aptitude skills with

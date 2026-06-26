@@ -588,7 +588,7 @@ const CodingJourney = () => {
                     <span>CODING ANALYTICS & PRACTICE</span>
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                    Welcome Back, {user?.name || "PrepSphere User"}
+                    Level Up Your Coding Journey
                   </h1>
                   <p className="text-sm text-slate-300 leading-relaxed font-light font-sans">
                     Track your coding progress, analyze your performance, and prepare for coding interviews with AI-generated practice problems.

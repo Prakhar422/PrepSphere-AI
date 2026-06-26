@@ -355,7 +355,7 @@ const ResumeAnalyzer = () => {
               <div className="space-y-1">
                 <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
                   <FileSearch className="w-8 h-8 text-indigo-400" />
-                  AI Resume Analyzer
+                  Perfect Your Resume for Success
                 </h1>
                 <p className="text-sm text-slate-300 leading-relaxed max-w-3xl">
                   Upload your resume and receive an AI-powered ATS analysis, recruiter insights, missing keywords, and personalized improvement suggestions.
