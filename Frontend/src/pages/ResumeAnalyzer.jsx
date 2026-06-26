@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+
 import api from "../services/api";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Brain,
@@ -38,10 +39,8 @@ import TopNavbar from "../components/layout/TopNavbar";
 // Placeholder JSON data representing ATS and Recruiter feedback schema
 
 
-const initialHistory = [];
 
 const ResumeAnalyzer = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -57,7 +56,7 @@ const ResumeAnalyzer = () => {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [uploadedResume, setUploadedResume] = useState(null);
   const [lastAnalysis, setLastAnalysis] = useState(null);
-  const [historyList, setHistoryList] = useState(initialHistory);
+
 
   // Fetch last scanned resume summary on mount
   useEffect(() => {
@@ -202,17 +201,9 @@ const ResumeAnalyzer = () => {
           atsScore: response.data.analysis.atsAnalysis?.score || 0
         });
 
-        // Add to history list using backend resume and analysis values
-        const newHistoryItem = {
-          id: backendResume.id,
-          name: backendResume.resumeName,
-          date: new Date(backendResume.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-          score: response.data.analysis.atsAnalysis?.score || response.data.analysis.atsScore || 0,
-          status: (response.data.analysis.atsAnalysis?.score || response.data.analysis.atsScore || 0) >= 80 ? "Analyzed" : "Needs Optimization",
-          data: response.data.analysis
-        };
 
-        setHistoryList(prev => [newHistoryItem, ...prev]);
+
+
       } else {
         throw new Error(response.data?.message || "Upload failed");
       }
@@ -223,20 +214,7 @@ const ResumeAnalyzer = () => {
     }
   };
 
-  const loadHistoryItem = (item) => {
-    setSelectedFile({
-      name: item.name,
-      size: "Verified Archive",
-      rawFile: null
-    });
-    setUploadedResume({
-      id: item.id,
-      resumeName: item.name,
-      resumeUrl: item.data?.documentSource?.cloudinaryUrl || item.data?.resumeUrl || "",
-      fileSize: item.data?.documentSource?.fileSize || item.data?.fileSize || 0
-    });
-    setAnalysisResult(item.data);
-  };
+
 
   const handleOpenResume = () => {
     if (!uploadedResume) {
@@ -252,7 +230,7 @@ const ResumeAnalyzer = () => {
     try {
       new URL(url);
       isValid = true;
-    } catch (e) {
+    } catch {
       isValid = false;
     }
     if (!isValid) {
@@ -277,7 +255,7 @@ const ResumeAnalyzer = () => {
     try {
       new URL(url);
       isValid = true;
-    } catch (e) {
+    } catch {
       isValid = false;
     }
     if (!isValid) {
@@ -298,10 +276,7 @@ const ResumeAnalyzer = () => {
     }
   };
 
-  const deleteHistoryItem = (id, e) => {
-    e.stopPropagation();
-    setHistoryList(prev => prev.filter(item => item.id !== id));
-  };
+
 
 
 

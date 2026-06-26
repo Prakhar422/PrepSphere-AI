@@ -44,7 +44,7 @@ const CodeEditor = ({ questionId, language, value, onChange, disabled }) => {
       const template = STARTER_TEMPLATES[language] || "";
       onChange(template);
     }
-  }, [questionId, language]);
+  }, [questionId, language, onChange]);
 
   // Handle local save on every code change
   const handleEditorChange = (val) => {

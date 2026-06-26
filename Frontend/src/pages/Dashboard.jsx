@@ -227,20 +227,6 @@ const Dashboard = () => {
     fetchQotd();
   }, []);
 
-  // States for interactive UI toggles
-  const [reminders, setReminders] = useState({
-    leetcode: false,
-    codeforces: false,
-    codechef: false,
-  });
-
-  const toggleReminder = (contestKey) => {
-    setReminders((prev) => ({
-      ...prev,
-      [contestKey]: !prev[contestKey],
-    }));
-  };
-
   // Calculation of preparation progress percentages
   const todayRaw = aptitudeSummary.progress?.today || 0;
   const weekRaw = aptitudeSummary.progress?.week || 0;
@@ -262,28 +248,6 @@ const Dashboard = () => {
     TrendingUp: TrendingUp,
     Code2: Code2
   };
-
-  // Contest Mock Data
-  const contests = [
-    {
-      key: "leetcode",
-      name: "LeetCode Weekly Contest",
-      date: "June 14, 2026",
-      time: "08:00 AM",
-    },
-    {
-      key: "codeforces",
-      name: "Codeforces Round #1024",
-      date: "June 16, 2026",
-      time: "07:35 PM",
-    },
-    {
-      key: "codechef",
-      name: "CodeChef Starters #150",
-      date: "June 17, 2026",
-      time: "08:00 PM",
-    },
-  ];
 
 
 
@@ -406,7 +370,7 @@ const Dashboard = () => {
               {/* Card 1: Aptitude Score */}
               <motion.div
                 variants={itemVariants}
-                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all duration-300"
+                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all duration-300"
               >
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
@@ -451,7 +415,7 @@ const Dashboard = () => {
               {/* Card 2: Resume ATS Score */}
               <motion.div
                 variants={itemVariants}
-                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 transition-all duration-300"
+                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all duration-300"
               >
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
@@ -488,7 +452,7 @@ const Dashboard = () => {
               {/* Card 3: Average Interview Score */}
               <motion.div
                 variants={itemVariants}
-                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all duration-300"
+                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all duration-300"
               >
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
                 <div className="flex justify-between items-start">
@@ -521,7 +485,7 @@ const Dashboard = () => {
               {/* Card 4: Coding Score */}
               <motion.div
                 variants={itemVariants}
-                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all duration-300"
+                className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all duration-300"
               >
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
                 <div className="flex justify-between items-start">

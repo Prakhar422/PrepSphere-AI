@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
@@ -93,9 +94,8 @@ const Settings = () => {
 
 
   // Appearance preferences state
-  const [accentColor, setAccentColor] = useState("purple"); // 'purple' | 'blue' | 'cyan' | 'emerald'
-  const [density, setDensity] = useState("comfortable"); // 'comfortable' | 'compact'
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
+  const accentColor = "purple"; // 'purple' | 'blue' | 'cyan' | 'emerald'
+  const density = "comfortable"; // 'comfortable' | 'compact'
 
   // Loading States
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -159,15 +159,16 @@ const Settings = () => {
       }
     };
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Connected accounts state toggles (Google, GitHub linked by default)
   const [googleConnected, setGoogleConnected] = useState(true);
   const [githubConnected, setGithubConnected] = useState(true);
-  const [linkedinConnected, setLinkedinConnected] = useState(false);
-  const [leetcodeConnected, setLeetcodeConnected] = useState(false);
-  const [gfgConnected, setGfgConnected] = useState(false);
-  const [codeforcesConnected, setCodeforcesConnected] = useState(false);
+  const linkedinConnected = false;
+  const leetcodeConnected = false;
+  const gfgConnected = false;
+  const codeforcesConnected = false;
 
   // Interactive Modal Type overlays controller
   const [modalType, setModalType] = useState("none"); // 'none' | 'password' | 'email' | 'delete-history' | 'delete-account'
@@ -630,10 +631,7 @@ const Settings = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+
 
   return (
     <>

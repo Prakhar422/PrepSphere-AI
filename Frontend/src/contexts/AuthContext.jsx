@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext(null);
@@ -16,6 +16,13 @@ export const AuthProvider = ({ children }) => {
     }
     setUser(userData);
   };
+
+   // Logout handler
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    setAuthUser(null);
+  }, []);
 
   // Auto-restoration on startup
   useEffect(() => {
@@ -55,7 +62,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       window.removeEventListener('auth-unauthorized', handleUnauthorized);
     };
-  }, []);
+  }, [logout]);
 
   // Login handler
   const login = async (email, password, rememberMe) => {
@@ -130,12 +137,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout handler
-  const logout = () => {
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    setAuthUser(null);
-  };
+ 
 
   const updateUser = (userData) => {
     setAuthUser(userData);

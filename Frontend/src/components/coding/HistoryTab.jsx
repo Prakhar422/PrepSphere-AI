@@ -19,7 +19,6 @@ const HistoryTab = ({
   questions,
   totalPages,
   currentPage,
-  totalResults,
   loading,
   onPageChange,
   onViewDetails,

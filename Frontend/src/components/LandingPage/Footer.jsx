@@ -166,9 +166,9 @@ const Footer = () => {
             </div>
             
             <div className="flex items-center space-x-1.5 font-light">
-              <span>Built with</span>
-              <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500 animate-pulse" />
-              <span>for students and future professionals.</span>
+              
+              
+              <span>Built for students and future professionals.</span>
             </div>
           </div>
 

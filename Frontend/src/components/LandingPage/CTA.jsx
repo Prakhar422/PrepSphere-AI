@@ -1,7 +1,6 @@
 import React from "react";
 import { ArrowRight, PlayCircle, Users, Trophy, Briefcase, Sparkles } from "lucide-react";
 import {useNavigate} from "react-router-dom";
-import signup from "../../pages/SignUp";
 
 const CTA = () => {
 
@@ -111,13 +110,7 @@ const CTA = () => {
                 </button>
 
                 {/* Secondary CTA: Watch Demo */}
-                <button className="relative group w-full sm:w-auto inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm sm:text-base font-medium text-slate-200 cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] focus:outline-none">
-                  <span className="absolute inset-0 bg-white/10 rounded-full group-hover:bg-white/20 transition-all duration-300" />
-                  <span className="relative w-full sm:w-auto px-8 py-3.5 bg-[#050B1F]/60 rounded-full backdrop-blur-md border border-white/5 transition-all duration-300 flex items-center justify-center gap-2">
-                    <PlayCircle className="w-5 h-5 text-indigo-400 group-hover:text-white transition-colors duration-300" />
-                    Watch Demo
-                  </span>
-                </button>
+               
 
               </div>
 

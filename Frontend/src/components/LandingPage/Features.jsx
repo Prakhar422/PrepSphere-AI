@@ -147,10 +147,10 @@ const Features = () => {
                   </div>
 
                   {/* Micro-interaction: Action link */}
-                  <div className="flex items-center text-xs font-semibold text-indigo-400 mt-6 group-hover:text-indigo-300 transition-colors duration-300 cursor-pointer">
+                  {/* <div className="flex items-center text-xs font-semibold text-indigo-400 mt-6 group-hover:text-indigo-300 transition-colors duration-300 cursor-pointer">
                     <span>Explore tool</span>
                     <ArrowRight className="w-3.5 h-3.5 ml-1 transform group-hover:translate-x-1.5 transition-transform duration-300" />
-                  </div>
+                  </div> */}
 
                   {/* Custom bottom animated gradient line */}
                   <div className={`absolute bottom-0 left-0 right-0 h-[2.5px] bg-gradient-to-r ${feature.gradient} rounded-b-2xl transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-center`} />

@@ -1,5 +1,4 @@
 import React from "react";
-import signup from "../../pages/SignUp";
 import {useNavigate} from "react-router-dom";
 
 import { 
@@ -127,7 +126,8 @@ function Hero() {
                 </button>
 
                 {/* Secondary Button */}
-                <button className="relative group inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm sm:text-base font-medium text-slate-200 cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] focus:outline-none">
+                <button onClick={() => navigate("/resume-analyzer")}
+                 className="relative group inline-flex items-center justify-center p-[1px] rounded-full overflow-hidden text-sm sm:text-base font-medium text-slate-200 cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] focus:outline-none">
                   <span className="absolute inset-0 bg-white/10 rounded-full group-hover:bg-white/20 transition-all duration-300" />
                   <span className="relative px-8 py-3.5 bg-[#050B1F]/60 rounded-full backdrop-blur-md border border-white/5 transition-all duration-300 flex items-center justify-center gap-2">
                     <FileText className="w-4 h-4 text-indigo-400 group-hover:text-white transition-colors duration-300" />
@@ -311,11 +311,7 @@ function Hero() {
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
                   <Award className="w-4 h-4" />
                 </div>
-                <div className="text-left">
-                  <span className="block text-[8px] uppercase tracking-wider text-emerald-400 font-bold">Success</span>
-                  <span className="text-[11px] font-bold text-white">Offer Unlocked!</span>
-                  <span className="block text-[9px] text-slate-400">Amazon SDE-1</span>
-                </div>
+                
               </div>
 
               {/* Floating element 2: Interview Scheduled (Bottom Left) */}
@@ -323,18 +319,11 @@ function Hero() {
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/10 text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
                   <Calendar className="w-4 h-4" />
                 </div>
-                <div className="text-left">
-                  <span className="block text-[8px] uppercase tracking-wider text-indigo-400 font-bold">Upcoming</span>
-                  <span className="text-[11px] font-bold text-white">Mock Interview</span>
-                  <span className="block text-[9px] text-slate-400">Meta SDE Loop (Tuesday)</span>
-                </div>
+                
               </div>
 
-              {/* Floating element 3: Core CPU Processing unit icon (Top Left) */}
-              <div className="absolute -top-10 left-10 flex items-center space-x-2 bg-slate-950/60 border border-white/5 backdrop-blur-md rounded-full px-3 py-1.5 text-xs text-indigo-300 z-20 shadow-md animate-float-fast">
-                <Cpu className="w-3.5 h-3.5 text-cyan-400 animate-spin-slow" />
-                <span className="font-mono text-[9px] tracking-widest text-slate-300">CPU-LOAD: 12%</span>
-              </div>
+              
+              
 
             </div>
 

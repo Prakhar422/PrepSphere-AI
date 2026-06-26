@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import {
   Brain,
   FileSearch,
@@ -197,16 +196,21 @@ const MOCK_QUESTIONS = [
   },
 ];
 
+const LOADING_MESSAGES = [
+  "Preparing your aptitude quiz...",
+  "Generating AI Quiz...",
+  "Preparing Placement-Oriented Questions...",
+  "Selecting Balanced Difficulty...",
+  "Creating Personalized Assessment...",
+];
+
 const AptitudePractice = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Active quiz state from backend
   const [attemptId, setAttemptId] = useState(null);
   const [quizId, setQuizId] = useState(null);
-  const [quizCategory, setQuizCategory] = useState("");
-  const [quizDifficulty, setQuizDifficulty] = useState("");
   const [questions, setQuestions] = useState([]);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
   const [apiError, setApiError] = useState(null);
@@ -216,16 +220,13 @@ const AptitudePractice = () => {
 
   // Developer settings / Interactive states simulation
   const [hasAttemptedQuizzes, setHasAttemptedQuizzes] = useState(true);
-  const [simulateUnfinishedQuiz, setSimulateUnfinishedQuiz] = useState(false);
 
   // Dashboard Stats State
   const [dashboardData, setDashboardData] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
-  const [dashboardError, setDashboardError] = useState(null);
 
   const fetchDashboardData = useCallback(async () => {
     setLoadingDashboard(true);
-    setDashboardError(null);
     try {
       const response = await api.get("/aptitude/dashboard");
       if (response.data && response.data.success) {
@@ -238,11 +239,6 @@ const AptitudePractice = () => {
       }
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
-      setDashboardError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to fetch preparation statistics.",
-      );
     } finally {
       setLoadingDashboard(false);
     }
@@ -261,20 +257,12 @@ const AptitudePractice = () => {
 
   // Loading view cycle status message index
   const [loadingStep, setLoadingStep] = useState(0);
-  const loadingMessages = [
-    "Preparing your aptitude quiz...",
-    "Generating AI Quiz...",
-    "Preparing Placement-Oriented Questions...",
-    "Selecting Balanced Difficulty...",
-    "Creating Personalized Assessment...",
-  ];
 
   // Active quiz states
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [answers, setAnswers] = useState({}); // { [questionIdx]: selectedOptionKey }
   const [flaggedQuestions, setFlaggedQuestions] = useState({}); // { [questionIdx]: boolean }
   const [skippedQuestions, setSkippedQuestions] = useState({}); // { [questionIdx]: boolean }
-  const [showHint, setShowHint] = useState(false);
   const [showPaletteDrawer, setShowPaletteDrawer] = useState(false);
 
   // Quiz Timer states
@@ -350,16 +338,12 @@ const AptitudePractice = () => {
     if (savedView === "quiz") {
       const savedAttemptId = sessionStorage.getItem("active_quiz_attemptId");
       const savedQuizId = sessionStorage.getItem("active_quiz_quizId");
-      const savedCategory = sessionStorage.getItem("active_quiz_category");
-      const savedDifficulty = sessionStorage.getItem("active_quiz_difficulty");
       const savedQuestions = sessionStorage.getItem("active_quiz_questions");
       const savedAnswers = sessionStorage.getItem("active_quiz_answers");
 
       if (savedAttemptId && savedQuizId && savedQuestions) {
         setAttemptId(savedAttemptId);
         setQuizId(savedQuizId);
-        setQuizCategory(savedCategory || "");
-        setQuizDifficulty(savedDifficulty || "");
         setQuestions(JSON.parse(savedQuestions));
         if (savedAnswers) {
           setAnswers(JSON.parse(savedAnswers));
@@ -390,7 +374,6 @@ const AptitudePractice = () => {
     setSkippedQuestions({});
     setCurrentQuestionIdx(0);
     setTimeLeft(900);
-    setShowHint(false);
 
     try {
       const response = await api.post("/aptitude/generate", {
@@ -403,8 +386,6 @@ const AptitudePractice = () => {
         const startedTime = Date.now();
         setAttemptId(data.attemptId);
         setQuizId(data.quiz._id);
-        setQuizCategory(data.quiz.category);
-        setQuizDifficulty(data.quiz.difficulty);
         setQuestions(data.quiz.questions);
 
         // Store active quiz configuration & started time in sessionStorage for recovery on refresh
@@ -456,7 +437,7 @@ const AptitudePractice = () => {
     if (view === "loading") {
       const stepInterval = setInterval(() => {
         setLoadingStep((prev) => {
-          if (prev >= loadingMessages.length - 1) {
+          if (prev >= LOADING_MESSAGES.length - 1) {
             return prev; // hold at the last message or wrap
           }
           return prev + 1;
@@ -531,10 +512,10 @@ const AptitudePractice = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [view, currentQuestionIdx, answers, submitActiveQuiz]);
+  }, [view, currentQuestionIdx, answers, submitActiveQuiz, handleNextQuestion, handlePrevQuestion, handleSelectOption]);
 
   // Options selections
-  const handleSelectOption = (optionKey) => {
+  const handleSelectOption = useCallback((optionKey) => {
     if (timeLeft <= 0) return;
     setAnswers((prev) => ({
       ...prev,
@@ -548,22 +529,20 @@ const AptitudePractice = () => {
         return copy;
       });
     }
-  };
+  }, [timeLeft, currentQuestionIdx, skippedQuestions]);
 
   // Navigations inside the quiz
-  const handleNextQuestion = () => {
+  const handleNextQuestion = useCallback(() => {
     if (currentQuestionIdx < 9) {
       setCurrentQuestionIdx((prev) => prev + 1);
-      setShowHint(false);
     }
-  };
+  }, [currentQuestionIdx]);
 
-  const handlePrevQuestion = () => {
+  const handlePrevQuestion = useCallback(() => {
     if (currentQuestionIdx > 0) {
       setCurrentQuestionIdx((prev) => prev - 1);
-      setShowHint(false);
     }
-  };
+  }, [currentQuestionIdx]);
 
   const handleSkipQuestion = () => {
     setSkippedQuestions((prev) => ({
@@ -822,7 +801,7 @@ const AptitudePractice = () => {
                     <>
                       {/* Statistics Cards */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all">
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -850,7 +829,7 @@ const AptitudePractice = () => {
                           </div>
                         </div>
 
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 transition-all">
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -876,7 +855,7 @@ const AptitudePractice = () => {
                           </div>
                         </div>
 
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all">
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -899,7 +878,7 @@ const AptitudePractice = () => {
                           </div>
                         </div>
 
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all">
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -1490,7 +1469,7 @@ const AptitudePractice = () => {
                           transition={{ duration: 0.25 }}
                           className="text-sm text-indigo-300 font-semibold font-mono"
                         >
-                          {loadingMessages[loadingStep]}
+                          {LOADING_MESSAGES[loadingStep]}
                         </motion.span>
                       </AnimatePresence>
                     </div>
@@ -1776,7 +1755,6 @@ const AptitudePractice = () => {
                               key={idx}
                               onClick={() => {
                                 setCurrentQuestionIdx(idx);
-                                setShowHint(false);
                               }}
                               className={`relative w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs font-mono transition-all cursor-pointer ${
                                 isCurrent
@@ -1884,7 +1862,6 @@ const AptitudePractice = () => {
                                   onClick={() => {
                                     setCurrentQuestionIdx(idx);
                                     setShowPaletteDrawer(false);
-                                    setShowHint(false);
                                   }}
                                   className={`relative w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs font-mono transition-all cursor-pointer ${
                                     isCurrent

@@ -16,23 +16,26 @@ import {
 } from "lucide-react";
 
 // Mini internal reusable card components for cleaner architecture
-const MetricCard = ({ title, value, subtext, icon: Icon, colorClass, gradient }) => (
-  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex items-center justify-between shadow-lg relative overflow-hidden group hover:border-white/10 hover:bg-white/[0.04] transition-all duration-300">
-    <div className="absolute inset-0 bg-radial-gradient from-white/[0.01] to-transparent pointer-events-none" />
-    <div className="space-y-1">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{title}</span>
-      <div className="flex items-baseline space-x-1">
-        <h4 className={`text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r ${gradient} tracking-tight`}>
-          {value}
-        </h4>
+const MetricCard = (props) => {
+  const { title, value, subtext, icon: Icon, colorClass, gradient } = props;
+  return (
+    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex items-center justify-between shadow-lg relative overflow-hidden group hover:border-white/10 hover:bg-white/[0.04] transition-all duration-300">
+      <div className="absolute inset-0 bg-radial-gradient from-white/[0.01] to-transparent pointer-events-none" />
+      <div className="space-y-1">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{title}</span>
+        <div className="flex items-baseline space-x-1">
+          <h4 className={`text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r ${gradient} tracking-tight`}>
+            {value}
+          </h4>
+        </div>
+        <p className="text-[9px] text-slate-500 font-medium">{subtext}</p>
       </div>
-      <p className="text-[9px] text-slate-500 font-medium">{subtext}</p>
+      <div className={`p-2.5 rounded-xl border ${colorClass} transition-transform duration-300 group-hover:scale-110`}>
+        <Icon className="w-4 h-4" />
+      </div>
     </div>
-    <div className={`p-2.5 rounded-xl border ${colorClass} transition-transform duration-300 group-hover:scale-110`}>
-      <Icon className="w-4 h-4" />
-    </div>
-  </div>
-);
+  );
+};
 
 const DashboardPreview = () => {
   const metrics = [

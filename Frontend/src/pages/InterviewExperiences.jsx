@@ -190,7 +190,6 @@ const InterviewExperiences = () => {
 
   // ─── UI State ─────────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isEmptyState, setIsEmptyState] = useState(false);
 
   // ─── Share/Edit Form ──────────────────────────────────────────────────────────
   const [shareFormOpen, setShareFormOpen] = useState(false);

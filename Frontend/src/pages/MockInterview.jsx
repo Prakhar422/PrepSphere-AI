@@ -9,8 +9,9 @@ import {
   getInterviewReport as apiGetInterviewReport,
   deleteInterview as apiDeleteInterview
 } from "../services/interviewService";
-import { generateInterviewReportPDF, getAdaptiveMetrics } from "../utils/reportPdfGenerator";
-import { motion, AnimatePresence } from "framer-motion";
+import { getAdaptiveMetrics } from "../utils/reportPdfGenerator";
+import { AnimatePresence } from "framer-motion";
+import { jsPDF } from "jspdf";
 import {
   ResponsiveContainer,
   RadarChart,
@@ -123,107 +124,7 @@ const INTERVIEW_TYPES = [
   }
 ];
 
-// Realistic placeholder historical mock data representing initial interview records
-const initialHistoryRecords = [
-  {
-    id: "int-101",
-    category: "Technical",
-    company: "Google",
-    role: "Software Engineer",
-    difficulty: "Hard",
-    score: 88,
-    date: "Jun 10, 2026",
-    duration: "30 Min",
-    status: "Completed",
-    metrics: {
-      confidence: 85,
-      communication: 90,
-      technicalAccuracy: 88,
-      professionalism: 92,
-      problemSolving: 85
-    },
-    radarData: [
-      { subject: "Confidence", value: 85 },
-      { subject: "Communication", value: 90 },
-      { subject: "Technical Accuracy", value: 88 },
-      { subject: "Problem Solving", value: 85 },
-      { subject: "Professionalism", value: 92 },
-      { subject: "Critical Thinking", value: 80 }
-    ],
-    strengths: [
-      "Demonstrated strong problem-solving patterns during technical design.",
-      "Clear explanation of time and space complexity variables (O(N) vs O(log N)).",
-      "Very professional communication tone and adaptive explanation style."
-    ],
-    weaknesses: [
-      "Slightly hesitated when asked about edge-cases like memory limits.",
-      "Brief pauses before speaking, showing initial latency under hard questions."
-    ],
-    topics: ["Arrays & HashMaps", "System Design Patterns", "Time Complexity O-Notation"],
-    questionsReviewed: [
-      {
-        question: "Explain the difference between a process and a thread, and how threads share memory.",
-        answer: "A process is an isolated execution environment with its own memory allocation. A thread is a lightweight unit of execution within a process, sharing the parent process's memory space and files which makes context switching faster but introduces race conditions.",
-        ideal: "A process is a self-contained execution environment with a private memory space. A thread is an execution path inside a process. Threads of the same process share code, data, and OS resources (files/heaps), but have their own stack and registers.",
-        score: 92,
-        feedback: "Excellent precision. Accurately highlighted the sharing aspect and the risk of race conditions."
-      },
-      {
-        question: "How would you design a caching mechanism for a database query with highly repeating inputs?",
-        answer: "I would place a Redis cache in front of the database. When a query comes, I check Redis first. If it is a hit, return it. If it is a miss, query DB and populate Redis with a TTL of 3600 seconds.",
-        ideal: "Utilize an In-memory key-value store (like Redis or Memcached) acting as a caching layer. Implement cache-aside or read-through strategies, specifying strict LRU eviction policies, key expiration TTLs, and cache invalidation policies on mutation.",
-        score: 84,
-        feedback: "Solid architecture description. Could expand on cache eviction rules and cache invalidation challenges."
-      }
-    ],
-    recommendation: "Ready for Placements"
-  },
-  {
-    id: "int-102",
-    category: "HR",
-    company: "Amazon",
-    role: "Full Stack Developer",
-    difficulty: "Medium",
-    score: 76,
-    date: "Jun 04, 2026",
-    duration: "15 Min",
-    status: "Needs Practice",
-    metrics: {
-      confidence: 72,
-      communication: 80,
-      technicalAccuracy: 70,
-      professionalism: 85,
-      problemSolving: 75
-    },
-    radarData: [
-      { subject: "Confidence", value: 72 },
-      { subject: "Communication", value: 80 },
-      { subject: "Technical Accuracy", value: 70 },
-      { subject: "Problem Solving", value: 75 },
-      { subject: "Professionalism", value: 85 },
-      { subject: "Critical Thinking", value: 78 }
-    ],
-    strengths: [
-      "Polite communication style.",
-      "Good alignment with core leadership principles."
-    ],
-    weaknesses: [
-      "Weak responses on conflict resolution scenario questions.",
-      "Stuttered when describing previous project bottlenecks."
-    ],
-    topics: ["Conflict Resolution", "Leadership Principles", "STAR Response Method"],
-    questionsReviewed: [
-      {
-        question: "Tell me about a time you had a conflict with a team member. How did you resolve it?",
-        answer: "We had a disagreement about database schemas. I eventually just let them build it their way because we were running out of time.",
-        ideal: "Describe a structured conflict using the STAR method. Emphasize active listening, objective evaluation of facts (e.g. benchmarking both schemas), collaborating to find a compromise, and focusing on project success over personal opinions.",
-        score: 65,
-        feedback: "Avoid passive yielding. Show active leadership, collaboration, and how you reached a mutually beneficial decision."
-      }
-    ],
-    recommendation: "Needs Practice"
-  }
-];
+
 
 // Presets for simulated AI interviewer prompts
 const AI_QUESTION_PRESETS = {
@@ -367,7 +268,6 @@ const MockInterview = () => {
   // Active Chat State
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
-  const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -381,7 +281,6 @@ const MockInterview = () => {
     remainingQuestions: 15,
     progressPercentage: 0
   });
-  const [interviewCompleted, setInterviewCompleted] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [pendingAnswer, setPendingAnswer] = useState("");
   const [apiError, setApiError] = useState("");
@@ -483,7 +382,6 @@ const MockInterview = () => {
       
       if (data && data.success) {
         setElapsedTime(0);
-        setActiveQuestionIdx(0);
         setLiveMetrics({
           confidence: 75,
           communication: 78,
@@ -512,7 +410,6 @@ const MockInterview = () => {
         });
 
         setEvaluations([]);
-        setInterviewCompleted(false);
 
         // First AI Message
         setChatMessages([
@@ -640,14 +537,13 @@ const MockInterview = () => {
             { sender: "ai", text: feedbackText, timestamp: new Date() }
           ]);
           setIsTyping(false);
-          handleEndInterview(updatedEvals);
+          handleEndInterview();
         } else {
           setChatMessages((prev) => [
             ...prev,
             { sender: "ai", text: feedbackText, timestamp: new Date() },
             { sender: "ai", text: res.nextQuestion, timestamp: new Date() }
           ]);
-          setActiveQuestionIdx(res.currentQuestionNumber - 1);
           setIsTyping(false);
         }
       } else {
@@ -679,7 +575,7 @@ const MockInterview = () => {
   };
 
   // 4. Force termination or normal completion
-  const handleEndInterview = async (finalEvals) => {
+  const handleEndInterview = async () => {
     setIsLoading(true);
     clearInterval(timerRef.current);
     
@@ -693,7 +589,6 @@ const MockInterview = () => {
       const data = await apiGetInterviewReport(interviewId);
       if (data && data.success) {
         setActiveReport(data.report);
-        setInterviewCompleted(true);
         setCurrentView("complete");
       } else {
         throw new Error("Failed to load interview report.");
@@ -1399,7 +1294,7 @@ const MockInterview = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         
                         {/* Card 1: Average Score */}
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 transition-all">
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-indigo-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -1430,7 +1325,7 @@ const MockInterview = () => {
                         </div>
 
                         {/* Card 2: Best Interview */}
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 transition-all">
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-purple-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -1455,7 +1350,7 @@ const MockInterview = () => {
                         </div>
 
                         {/* Card 3: Total Interviews */}
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 transition-all">
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-cyan-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -1476,7 +1371,7 @@ const MockInterview = () => {
                         </div>
 
                         {/* Card 4: Practice Streak */}
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 transition-all">
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 text-left relative overflow-hidden group hover:border-pink-500/25 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] transition-all">
                           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-500/20 to-transparent" />
                           <div className="flex justify-between items-start">
                             <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">

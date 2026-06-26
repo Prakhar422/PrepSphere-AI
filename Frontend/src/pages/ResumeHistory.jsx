@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+
 import api from "../services/api";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
@@ -32,7 +33,6 @@ import {
 } from "lucide-react";
 
 const ResumeHistory = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -107,7 +107,7 @@ const ResumeHistory = () => {
     try {
       new URL(resumeUrl);
       isValid = true;
-    } catch (e) {
+    } catch {
       isValid = false;
     }
     if (!isValid) {
@@ -127,7 +127,7 @@ const ResumeHistory = () => {
     try {
       new URL(resumeUrl);
       isValid = true;
-    } catch (e) {
+    } catch {
       isValid = false;
     }
     if (!isValid) {

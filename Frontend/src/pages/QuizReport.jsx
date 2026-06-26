@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+
 import api from "../services/api";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/layout/Sidebar";
 import TopNavbar from "../components/layout/TopNavbar";
@@ -34,7 +35,6 @@ import {
 
 const QuizReport = () => {
   const { attemptId } = useParams();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -44,7 +44,7 @@ const QuizReport = () => {
   const [error, setError] = useState(null);
   const [expandedExplanations, setExpandedExplanations] = useState({});
 
-  const fetchReportDetails = async () => {
+  const fetchReportDetails = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -66,13 +66,13 @@ const QuizReport = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [attemptId]);
 
   useEffect(() => {
     if (attemptId) {
       fetchReportDetails();
     }
-  }, [attemptId]);
+  }, [attemptId, fetchReportDetails]);
 
   const toggleExplanation = (idx) => {
     setExpandedExplanations((prev) => ({

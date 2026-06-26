@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -36,7 +35,6 @@ import DetailedReportDrawer from "../components/coding/DetailedReportDrawer";
 
 
 const CodingJourney = () => {
-  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -130,7 +128,7 @@ const CodingJourney = () => {
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Fetch history data
-  const fetchHistoryData = async (pageToFetch = historyPage) => {
+  const fetchHistoryData = useCallback(async (pageToFetch = historyPage) => {
     setLoadingHistory(true);
     try {
       const params = {
@@ -157,7 +155,18 @@ const CodingJourney = () => {
     } finally {
       setLoadingHistory(false);
     }
-  };
+  }, [
+    historyPage,
+    historySearch,
+    historyCompany,
+    historyTopic,
+    historyDifficulty,
+    historyStatus,
+    historyLanguage,
+    historyStartDate,
+    historyEndDate,
+    historyBookmarkedOnly
+  ]);
 
   // Fetch analytics data
   const fetchAnalyticsData = async () => {
@@ -241,30 +250,7 @@ const CodingJourney = () => {
     }
   };
 
-  // Continue solving a specific question
-  const handleContinueSolving = async (questionOrId) => {
-    const qId = questionOrId && typeof questionOrId === "object" ? questionOrId._id : questionOrId;
-    if (!qId) return;
-    setLoadingQuestion(true);
-    setErrorQuestion(null);
-    setEvaluationResult(null);
-    setOptimalSolutionExpanded(false);
-    navigate("/coding-journey/practice");
-    try {
-      const response = await getQuestionDetails(qId);
-      if (response.success && response.question) {
-        setGeneratedQuestion(response.question);
-        setCodeValue(response.latestSubmission?.code || "");
-      } else {
-        showToast("Failed to load question details.", "error");
-      }
-    } catch (err) {
-      console.error("Failed to continue practice:", err);
-      showToast("Failed to load question workspace.", "error");
-    } finally {
-      setLoadingQuestion(false);
-    }
-  };
+
 
   // Fetch dashboard stats and analytics when on the main analytics tab
   useEffect(() => {
@@ -279,7 +265,7 @@ const CodingJourney = () => {
     if (activeTab === "history") {
       fetchHistoryData(historyPage);
     }
-  }, [activeTab, historyPage]);
+  }, [activeTab, historyPage, fetchHistoryData]);
 
   // Reset pagination page to 1 when any filter changes
   useEffect(() => {
@@ -290,6 +276,9 @@ const CodingJourney = () => {
       fetchHistoryData(1);
     }
   }, [
+    activeTab,
+    historyPage,
+    fetchHistoryData,
     historySearch,
     historyCompany,
     historyTopic,
@@ -340,18 +329,7 @@ const CodingJourney = () => {
     setCustomTestCases(prev => prev.map(tc => tc.id === id ? { ...tc, input: value } : tc));
   };
 
-  const handleSelectQuestion = (q) => {
-    setGeneratedQuestion(q);
-    setCompanyInput(q.company || "");
-    setRoleInput(q.role || "");
-    setDifficulty(q.difficulty || "Easy");
-    setTopic(q.topic || "Arrays");
-    setLanguage(q.language || "C++");
-    setCtcInput(q.ctc || "");
-    setEvaluationResult(null);
-    setExpandedSubmissionId(null);
-    navigate("/coding-journey/practice");
-  };
+
 
   const handleSubmitCode = async () => {
     if (!generatedQuestion || !generatedQuestion._id) return;
@@ -484,13 +462,7 @@ const CodingJourney = () => {
     }
   };
 
-  // Actions scrolling handlers
-  const scrollToId = (id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
+
 
   return (
     <>

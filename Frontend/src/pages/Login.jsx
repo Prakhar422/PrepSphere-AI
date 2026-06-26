@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { 
@@ -26,14 +26,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  useEffect(() => {
-    const errorParam = searchParams.get('error');
-    if (errorParam) {
-      setErrorMessage(errorParam);
-    }
-  }, [searchParams]);
+  const [errorMessage, setErrorMessage] = useState(() => searchParams.get("error") || "");
 
   const handleSubmit = async (e) => {
     e.preventDefault();

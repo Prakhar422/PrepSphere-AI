@@ -122,6 +122,131 @@ const COLORS_GENERIC = [
 ];
 
 const AnalyticsTab = ({ data, dashboardData, loading }) => {
+  // 2. Prep Difficulty Distribution for Pie Chart
+  const pieDifficultyData = useMemo(() => {
+    const rawDist = data?.difficultyDistribution || [];
+    const counts = { Easy: 0, Medium: 0, Hard: 0 };
+    rawDist.forEach(item => {
+      if (counts[item.name] !== undefined) {
+        counts[item.name] = item.count || item.value || 0;
+      }
+    });
+    return [
+      { name: "Easy", value: counts.Easy, color: COLORS_DIFFICULTY.Easy },
+      { name: "Medium", value: counts.Medium, color: COLORS_DIFFICULTY.Medium },
+      { name: "Hard", value: counts.Hard, color: COLORS_DIFFICULTY.Hard }
+    ];
+  }, [data?.difficultyDistribution]);
+
+  const totalSolvedDifficulty = useMemo(() => {
+    return pieDifficultyData.reduce((acc, curr) => acc + curr.value, 0);
+  }, [pieDifficultyData]);
+
+  // Prep Category Distribution for exactly 8 target categories
+  const barCategoryData = useMemo(() => {
+    const rawDist = data?.categoryDistribution || [];
+    const categoriesOrder = [
+      "Arrays",
+      "Strings",
+      "Linked Lists",
+      "Trees",
+      "Graphs",
+      "Dynamic Programming",
+      "Binary Search",
+      "Sliding Window"
+    ];
+
+    const counts = {
+      "Arrays": 0,
+      "Strings": 0,
+      "Linked Lists": 0,
+      "Trees": 0,
+      "Graphs": 0,
+      "Dynamic Programming": 0,
+      "Binary Search": 0,
+      "Sliding Window": 0
+    };
+
+    rawDist.forEach(item => {
+      let name = item.name;
+      if (name === "Linked List") name = "Linked Lists";
+      const val = item.count || item.value || 0;
+
+      if (counts[name] !== undefined) {
+        counts[name] += val;
+      }
+    });
+
+    return categoriesOrder.map((name, idx) => ({
+      name,
+      count: counts[name],
+      fill: COLORS_GENERIC[idx % COLORS_GENERIC.length]
+    }));
+  }, [data?.categoryDistribution]);
+
+  const maxCategoryValue = useMemo(() => {
+    if (barCategoryData.length === 0) return 0;
+    return Math.max(...barCategoryData.map(d => d.count), 0);
+  }, [barCategoryData]);
+
+  // 3. Weekly Practice Sorted Chronologically (Mon - Sun)
+  const weeklyPracticeSorted = useMemo(() => {
+    const rawWeekly = data?.weeklyPractice || [];
+    const daysOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const countsMap = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+    
+    rawWeekly.forEach(item => {
+      const dayName = item.name || item.day;
+      if (dayName && countsMap[dayName] !== undefined) {
+        countsMap[dayName] = item.count || item.solved || 0;
+      }
+    });
+    
+    return daysOrder.map(day => ({
+      name: day,
+      count: countsMap[day]
+    }));
+  }, [data?.weeklyPractice]);
+
+  const weeklyTotal = useMemo(() => {
+    return weeklyPracticeSorted.reduce((acc, curr) => acc + curr.count, 0);
+  }, [weeklyPracticeSorted]);
+
+  // 4. Monthly Progress - Solved Questions aggregated from database questions list
+  const monthlyChartData = useMemo(() => {
+    const questions = dashboardData?.questions || [];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthlyCounts = {};
+    
+    const now = new Date();
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mName = months[d.getMonth()];
+      const year = d.getFullYear().toString().substring(2);
+      const label = `${mName} '${year}`;
+      last6Months.push(label);
+      monthlyCounts[label] = 0;
+    }
+    
+    questions.forEach(q => {
+      if (q.status === "solved" && q.lastSolvedAt) {
+        const d = new Date(q.lastSolvedAt);
+        const mName = months[d.getMonth()];
+        const year = d.getFullYear().toString().substring(2);
+        const label = `${mName} '${year}`;
+        if (monthlyCounts[label] !== undefined) {
+          monthlyCounts[label]++;
+        }
+      }
+    });
+    
+    return last6Months.map(label => ({
+      name: label,
+      count: monthlyCounts[label]
+    }));
+  }, [dashboardData?.questions]);
+
   if (loading) {
     return (
       <div className="h-[400px] flex flex-col items-center justify-center space-y-4">
@@ -199,131 +324,6 @@ const AnalyticsTab = ({ data, dashboardData, loading }) => {
     }
   ];
 
-  // 2. Prep Difficulty Distribution for Pie Chart
-  const pieDifficultyData = useMemo(() => {
-    const rawDist = data.difficultyDistribution || [];
-    const counts = { Easy: 0, Medium: 0, Hard: 0 };
-    rawDist.forEach(item => {
-      if (counts[item.name] !== undefined) {
-        counts[item.name] = item.count || item.value || 0;
-      }
-    });
-    return [
-      { name: "Easy", value: counts.Easy, color: COLORS_DIFFICULTY.Easy },
-      { name: "Medium", value: counts.Medium, color: COLORS_DIFFICULTY.Medium },
-      { name: "Hard", value: counts.Hard, color: COLORS_DIFFICULTY.Hard }
-    ];
-  }, [data.difficultyDistribution]);
-
-  const totalSolvedDifficulty = useMemo(() => {
-    return pieDifficultyData.reduce((acc, curr) => acc + curr.value, 0);
-  }, [pieDifficultyData]);
-
-  // Prep Category Distribution for exactly 8 target categories
-  const barCategoryData = useMemo(() => {
-    const rawDist = data.categoryDistribution || [];
-    const categoriesOrder = [
-      "Arrays",
-      "Strings",
-      "Linked Lists",
-      "Trees",
-      "Graphs",
-      "Dynamic Programming",
-      "Binary Search",
-      "Sliding Window"
-    ];
-
-    const counts = {
-      "Arrays": 0,
-      "Strings": 0,
-      "Linked Lists": 0,
-      "Trees": 0,
-      "Graphs": 0,
-      "Dynamic Programming": 0,
-      "Binary Search": 0,
-      "Sliding Window": 0
-    };
-
-    rawDist.forEach(item => {
-      let name = item.name;
-      if (name === "Linked List") name = "Linked Lists";
-      const val = item.count || item.value || 0;
-
-      if (counts[name] !== undefined) {
-        counts[name] += val;
-      }
-    });
-
-    return categoriesOrder.map((name, idx) => ({
-      name,
-      count: counts[name],
-      fill: COLORS_GENERIC[idx % COLORS_GENERIC.length]
-    }));
-  }, [data.categoryDistribution]);
-
-  const maxCategoryValue = useMemo(() => {
-    if (barCategoryData.length === 0) return 0;
-    return Math.max(...barCategoryData.map(d => d.count), 0);
-  }, [barCategoryData]);
-
-  // 3. Weekly Practice Sorted Chronologically (Mon - Sun)
-  const weeklyPracticeSorted = useMemo(() => {
-    const rawWeekly = data.weeklyPractice || [];
-    const daysOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const countsMap = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
-    
-    rawWeekly.forEach(item => {
-      const dayName = item.name || item.day;
-      if (dayName && countsMap[dayName] !== undefined) {
-        countsMap[dayName] = item.count || item.solved || 0;
-      }
-    });
-    
-    return daysOrder.map(day => ({
-      name: day,
-      count: countsMap[day]
-    }));
-  }, [data.weeklyPractice]);
-
-  const weeklyTotal = useMemo(() => {
-    return weeklyPracticeSorted.reduce((acc, curr) => acc + curr.count, 0);
-  }, [weeklyPracticeSorted]);
-
-  // 4. Monthly Progress - Solved Questions aggregated from database questions list
-  const monthlyChartData = useMemo(() => {
-    const questions = dashboardData?.questions || [];
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const monthlyCounts = {};
-    
-    const now = new Date();
-    const last6Months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const mName = months[d.getMonth()];
-      const year = d.getFullYear().toString().substring(2);
-      const label = `${mName} '${year}`;
-      last6Months.push(label);
-      monthlyCounts[label] = 0;
-    }
-    
-    questions.forEach(q => {
-      if (q.status === "solved" && q.lastSolvedAt) {
-        const d = new Date(q.lastSolvedAt);
-        const mName = months[d.getMonth()];
-        const year = d.getFullYear().toString().substring(2);
-        const label = `${mName} '${year}`;
-        if (monthlyCounts[label] !== undefined) {
-          monthlyCounts[label]++;
-        }
-      }
-    });
-    
-    return last6Months.map(label => ({
-      name: label,
-      count: monthlyCounts[label]
-    }));
-  }, [dashboardData?.questions]);
-
   // 5. Recent Activity List
   const recentActivityList = dashboardData?.recentActivity || [];
 
@@ -336,8 +336,8 @@ const AnalyticsTab = ({ data, dashboardData, loading }) => {
           return (
             <div
               key={i}
-              className={`relative bg-white/[0.02] border border-white/10 rounded-3xl p-5 text-left overflow-hidden backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] group ${
-                card.accentColor === "blue" ? "hover:border-blue-500/25" :
+              className={`relative bg-white/[0.02] border border-white/10 rounded-3xl p-5 text-left overflow-hidden backdrop-blur-xl transition-all duration-300  hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)] group ${
+                card.accentColor === "blue" ? "hover:border-indigo-500/25" :
                 card.accentColor === "purple" ? "hover:border-purple-500/25" :
                 card.accentColor === "cyan" ? "hover:border-cyan-500/25" :
                 "hover:border-pink-500/25"
