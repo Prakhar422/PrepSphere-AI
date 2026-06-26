@@ -116,16 +116,34 @@ Create a `.env` file in the root of the `Backend/` folder:
 
 ```env
 PORT=5000
+
+# Database
 MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/prepsphere
+
+# Authentication
 JWT_SECRET=your_jwt_signing_secret_key
+
+# Frontend URL
+CLIENT_URL=http://localhost:5173
+
+# Google OAuth
 GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret_key
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=your_github_oauth_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_client_secret_key
+GITHUB_CALLBACK_URL=http://localhost:5000/api/auth/github/callback
+
+# Cloudinary
 CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+
+# AI APIs
 GEMINI_API_KEY=your_gemini_api_key
 GROQ_API_KEY=your_groq_api_key
-CLIENT_URL=http://localhost:5173
 ```
 
 ---

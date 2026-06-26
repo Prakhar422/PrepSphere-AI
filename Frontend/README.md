@@ -77,19 +77,7 @@ Client-side navigation is managed declaratively using `react-router-dom`:
 
 ---
 
-## 🔌 Environment Variables
 
-Create a `.env` file in the root of the `Frontend/` folder (or `.env.local` for local development):
-
-```env
-VITE_API_URL=http://localhost:5000/api
-VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
-VITE_GEMINI_API_KEY=your_gemini_api_key_here # (Optional) Required if using Gemini API directly on the client
-```
-
-*Note: In production, configure these variables inside Vercel's Environment Variables settings.*
-
----
 
 ## 🛠️ Commands
 

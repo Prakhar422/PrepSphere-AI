@@ -103,28 +103,41 @@ cd Placement-Preparation
 
 ## 🔌 Environment Variables
 
-You must set up `.env` files in both the `Frontend/` and `Backend/` directories.
+You must set up `.env` files in both the `Backend/` directories.
 
-### Frontend (`Frontend/.env` or `.env.local`)
-```env
-VITE_API_URL=http://localhost:5000/api
-VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
-VITE_GEMINI_API_KEY=your_gemini_api_key_here # (Optional) Required if using Gemini API directly on the client
-```
+
 
 ### Backend (`Backend/.env`)
 ```env
 PORT=5000
+
+# Database
 MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/prepsphere
+
+# Authentication
 JWT_SECRET=your_jwt_signing_secret_key
+
+# Frontend URL
+CLIENT_URL=http://localhost:5173
+
+# Google OAuth
 GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret_key
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=your_github_oauth_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_client_secret_key
+GITHUB_CALLBACK_URL=http://localhost:5000/api/auth/github/callback
+
+# Cloudinary
 CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+
+# AI APIs
 GEMINI_API_KEY=your_gemini_api_key
 GROQ_API_KEY=your_groq_api_key
-CLIENT_URL=http://localhost:5173
 ```
 
 ---
@@ -149,7 +162,7 @@ npm run dev
 
 ---
 
-## 📸 Screenshots
+<!-- ## 📸 Screenshots
 
 *Placeholders for application screenshots:*
 
@@ -162,7 +175,7 @@ npm run dev
 #### 💬 AI Mock Interview Console
 `![Mock Interview Session](https://via.placeholder.com/800x450?text=PrepSphere+AI+Mock+Interview)`
 
----
+--- -->
 
 ## 🔮 Future Enhancements
 - **👥 Peer Coding Arena**: Real-time collaborative coding lobbies with integrated audio rooms.
@@ -176,8 +189,8 @@ npm run dev
 - **Name**: Prakhar Garg
 - **College**: Jabalpur Engineering College
 - **Degree**: B.Tech Information Technology (Class of 2026)
-- **GitHub**: [github.com/Prakhar422](https://github.com/Prakhar422) *(Placeholder)*
-- **LinkedIn**: [linkedin.com/in/prakhar-garg](https://linkedin.com/in/prakhar-garg) *(Placeholder)*
+- **GitHub**: [github.com/Prakhar422](https://github.com/Prakhar422) 
+- **LinkedIn**: [linkedin.com/in/prakhar-garg](www.linkedin.com/in/prakhar-garg-60a7a8256) 
 
 ---
 
